@@ -1,8 +1,9 @@
 import string
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlmodel import Session, select
 from app.models.models import ShortenedURL, URLCreate, ClickLog
+from app.config import settings
 
 
 class URLService:
@@ -42,11 +43,22 @@ class URLService:
         """Create a new shortened URL"""
         short_code = URLService.generate_unique_short_code(session)
         
+        # Set expiration time
+        expires_at = url_create.expires_at
+        
+        # If no expiration provided, use default (current time + default_url_expiration_days)
+        if expires_at is None:
+            expires_at = datetime.now(timezone.utc) + timedelta(days=settings.default_url_expiration_days)
+        else:
+            # Ensure expires_at is timezone-aware if provided
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        
         shortened_url = ShortenedURL(
             original_url=url_create.original_url,
             short_code=short_code,
             description=url_create.description,
-            expires_at=url_create.expires_at,
+            expires_at=expires_at,
             created_at=datetime.now(timezone.utc)
         )
         
@@ -72,8 +84,14 @@ class URLService:
             return None
         
         # Check if URL has expired
-        if shortened_url.expires_at and datetime.now(timezone.utc) > shortened_url.expires_at:
-            return None
+        if shortened_url.expires_at:
+            # Ensure expires_at is timezone-aware for comparison
+            expires_at = shortened_url.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            
+            if datetime.now(timezone.utc) > expires_at:
+                return None
         
         # Increment click count
         shortened_url.click_count += 1
@@ -134,6 +152,9 @@ class URLService:
             shortened_url.description = description
         
         if expires_at is not None:
+            # Ensure expires_at is timezone-aware
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
             shortened_url.expires_at = expires_at
         
         session.add(shortened_url)

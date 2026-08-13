@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     api_title: str = "URL Shortener API"
     api_version: str = "1.0.0"
     
+    # URL Expiration (in days)
+    default_url_expiration_days: int = 30
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

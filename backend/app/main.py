@@ -7,6 +7,9 @@ from app.models.models import ShortenedURL, ClickLog  # noqa: F401
 # Import database setup
 from app.database.db import create_db_and_tables
 
+# Import routes
+from app.routes.urls import router as urls_router
+
 # Import settings
 from app.config import settings
 
@@ -30,6 +33,9 @@ app = FastAPI(
     version=settings.api_version,
     lifespan=lifespan
 )
+
+# Include routes
+app.include_router(urls_router)
 
 
 @app.get("/")
