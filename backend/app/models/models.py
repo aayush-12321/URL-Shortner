@@ -18,7 +18,7 @@ class UserCreate(SQLModel):
     """Schema for registering a new user."""
     username: str = Field(min_length=3, max_length=50)
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=72)
 
 
 class UserLogin(SQLModel):
@@ -82,9 +82,17 @@ class Token(SQLModel):
     """JWT response payload."""
     access_token: str
     token_type: str = "bearer"
-    refresh_token: str | None = None
-
+    
 
 class TokenData(SQLModel):
     """Token metadata."""
     user_id: int | None = None
+
+class RefreshToken(SQLModel, table=True):
+    """Stored refresh tokens for rotation and revocation."""
+    id: int | None = Field(default=None, primary_key=True)
+    jti: str = Field(index=True, unique=True)
+    user_id: int = Field(foreign_key="user.id")
+    revoked: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: Optional[datetime] = None

@@ -4,6 +4,9 @@ from sqlmodel import Session
 from app.database.db import get_session
 from app.models.models import URLCreate, URLResponse, URLUpdate, ShortenedURL
 from app.services.url_service import URLService
+from app.models.models import User
+from app.auth.security import get_current_user, get_current_user_optional
+
 
 router = APIRouter(prefix="/api/v1", tags=["urls"])
 
@@ -22,7 +25,8 @@ router = APIRouter(prefix="/api/v1", tags=["urls"])
 )
 def create_shortened_url(
     url_create: URLCreate,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     """
     Create a new shortened URL.
@@ -34,7 +38,9 @@ def create_shortened_url(
     Returns the shortened URL with short code and metadata.
     """
     try:
-        shortened_url = URLService.create_shortened_url(session, url_create)
+        # pass owner_id when user is authenticated
+        owner_id = current_user.id if current_user else None
+        shortened_url = URLService.create_shortened_url(session, url_create, owner_id=owner_id)
         return URLResponse(
             short_code=shortened_url.short_code,
             original_url=shortened_url.original_url,
@@ -90,19 +96,24 @@ def redirect_to_original(
 )
 def get_url_stats(
     short_code: str,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get statistics for a shortened URL including click count.
     """
+    # ownership enforced: only owner can view stats
     shortened_url = URLService.get_url_stats(session, short_code)
-    
+
     if not shortened_url:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Short code not found"
         )
-    
+
+    if shortened_url.owner_id is None or shortened_url.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Stats are owner-only")
+
     return URLResponse(
         short_code=shortened_url.short_code,
         original_url=shortened_url.original_url,
@@ -125,30 +136,32 @@ def get_url_stats(
 def update_url(
     short_code: str,
     url_update: URLUpdate,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Update URL metadata like description or expiration date.
     """
+    # ensure ownership
+    existing = URLService.get_shortened_url(session, short_code)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Short code not found")
+    if existing.owner_id is None or existing.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this URL")
+
     updated_url = URLService.update_shortened_url(
         session,
         short_code,
         description=url_update.description,
-        expires_at=url_update.expires_at
+        expires_at=url_update.expires_at,
     )
-    
-    if not updated_url:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Short code not found"
-        )
-    
+
     return URLResponse(
         short_code=updated_url.short_code,
         original_url=updated_url.original_url,
         click_count=updated_url.click_count,
         created_at=updated_url.created_at,
-        description=updated_url.description
+        description=updated_url.description,
     )
 
 
@@ -163,19 +176,22 @@ def update_url(
 )
 def delete_url(
     short_code: str,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Delete a shortened URL and all its click logs.
     """
+    existing = URLService.get_shortened_url(session, short_code)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Short code not found")
+    if existing.owner_id is None or existing.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this URL")
+
     deleted = URLService.delete_shortened_url(session, short_code)
-    
     if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Short code not found"
-        )
-    
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Short code not found")
+
     return None
 
 
@@ -191,7 +207,8 @@ def delete_url(
 def list_all_urls(
     skip: int = 0,
     limit: int = 10,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get a paginated list of all shortened URLs.
@@ -201,16 +218,16 @@ def list_all_urls(
     """
     if limit > 100:
         limit = 100
-    
-    urls = URLService.get_all_urls(session, skip=skip, limit=limit)
-    
+
+    urls = URLService.get_urls_by_owner(session, owner_id=current_user.id, skip=skip, limit=limit)
+
     return [
         URLResponse(
             short_code=url.short_code,
             original_url=url.original_url,
             click_count=url.click_count,
             created_at=url.created_at,
-            description=url.description
+            description=url.description,
         )
         for url in urls
     ]

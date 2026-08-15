@@ -38,7 +38,8 @@ class URLService:
     @staticmethod
     def create_shortened_url(
         session: Session,
-        url_create: URLCreate
+        url_create: URLCreate,
+        owner_id: int | None = None,
     ) -> ShortenedURL:
         """Create a new shortened URL"""
         short_code = URLService.generate_unique_short_code(session)
@@ -58,6 +59,7 @@ class URLService:
             original_url=url_create.original_url,
             short_code=short_code,
             description=url_create.description,
+            owner_id=owner_id,
             expires_at=expires_at,
             created_at=datetime.now(timezone.utc)
         )
@@ -168,4 +170,11 @@ class URLService:
         """Get all shortened URLs with pagination"""
         return session.exec(
             select(ShortenedURL).offset(skip).limit(limit)
+        ).all()
+
+    @staticmethod
+    def get_urls_by_owner(session: Session, owner_id: int, skip: int = 0, limit: int = 10) -> list[ShortenedURL]:
+        """Get shortened URLs for a specific owner with pagination"""
+        return session.exec(
+            select(ShortenedURL).where(ShortenedURL.owner_id == owner_id).offset(skip).limit(limit)
         ).all()
