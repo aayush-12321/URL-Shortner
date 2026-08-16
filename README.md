@@ -1,83 +1,152 @@
-# URL Shortener
+# 🔗 Shortlink — Modern URL Shortener & Analytics
 
-A fast URL shortening service built with FastAPI and React.
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/Frontend-React_18-61DAFB?style=flat-square&logo=react)](https://react.dev/)
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python)](https://www.python.org/)
+[![uv](https://img.shields.io/badge/Package_Manager-uv-DE5B8B?style=flat-square)](https://github.com/astral-sh/uv)
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
-## Project Structure
+A high-performance, full-stack URL shortening service with real-time click tracking, custom link descriptions, user authentication, and a clean, grounded dashboard UI.
 
+---
+
+## ✨ Features
+
+- ⚡ **Instant URL Shortening**: Convert long, messy links into clean short URLs in milliseconds.
+- 🔒 **User Authentication**: Secure JWT-based registration and login via sleek popup modals.
+- 📋 **Link Dashboard**: View all your shortened URLs with real-time click counters and creation timestamps.
+- ✏️ **Full Link Management**:
+  - One-click **Copy to Clipboard** with instant visual confirmation.
+  - One-click **Open Link** in new tab.
+  - **Edit Notes & Descriptions** via popup dialogs.
+  - **Delete Links** with safe two-step confirmation.
+  - **Search & Filter** saved links instantly.
+- 🎨 **Grounded UI/UX**: Clean dark-slate design system with responsive layouts and accessible micro-interactions.
+- 🛡️ **Guest & User Modes**: Shorten links anonymously as a guest or log in to track analytics and manage saved links.
+
+---
+
+## 🏗️ Tech Stack
+
+### **Backend**
+- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.12+)
+- **Database & ORM**: [SQLModel](https://sqlmodel.tiangolo.com/) + SQLite / PostgreSQL
+- **Auth & Security**: OAuth2 with Password Hashing (Bcrypt) & JWT Tokens
+- **Package Management**: [uv](https://github.com/astral-sh/uv)
+
+### **Frontend**
+- **Framework**: [React 18](https://react.dev/)
+- **HTTP Client**: [Axios](https://axios-http.com/)
+- **Styling**: Vanilla CSS Design System (Custom Variables, Modern Typography, Responsive Grid)
+
+---
+
+## 📁 Directory Structure
+
+```text
+URL Shortener/
+├── pyproject.toml         # Root Python & uv dependency configuration
+├── docker-compose.yml     # Container orchestration setup
+├── backend/               # FastAPI Backend Service
+│   ├── app/
+│   │   ├── auth/          # JWT security & authentication routes
+│   │   ├── database/      # DB session & SQLModel setup
+│   │   ├── models/        # Pydantic & SQLModel schemas
+│   │   ├── routes/        # URL shorten, list, stats, edit, & delete endpoints
+│   │   ├── services/      # Business logic & click tracking service
+│   │   └── main.py        # FastAPI app entry point & CORS configuration
+│   └── database.db        # SQLite database storage
+└── frontend/              # React Frontend Web App
+    ├── public/            # Public assets & HTML template
+    └── src/
+        ├── components/    # Reusable UI components (Navbar, AuthModal, UrlList, etc.)
+        ├── App.js         # Main application container & state orchestration
+        └── index.css      # Design system & component stylesheet
 ```
-├── pyproject.toml    # Root uv project config
-├── backend/          # FastAPI backend
-│   ├── app/         # Main application code
-│   ├── tests/       # Unit tests
-│   ├── requirements.txt
-│   └── .env.example
-├── frontend/        # React frontend (optional)
-│   ├── src/
-│   └── public/
-└── README.md
-```
 
-## Backend Setup
+---
+
+## 🚀 Quickstart Guide
 
 ### Prerequisites
-- Python 3.12+
-- `uv` installed (`pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- **Python 3.12+**
+- **Node.js 18+** & **npm**
+- **uv** package manager (`pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
-### Installation
+---
 
-1. Open the project root:
+### 1. Backend Setup
+
+1. Navigate to the project root and install Python dependencies:
+   ```bash
+   uv sync
+   ```
+
+2. Create a `.env` file from the example:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Start the FastAPI development server:
+   ```bash
+   uv run uvicorn backend.app.main:app --reload --port 8000
+   ```
+   or
+   ```bash
+   uv run fastapi dev
+   ```
+   > 💡 The backend API server will run at **`http://localhost:8000`**.  
+   > 📖 Interactive Swagger API Docs available at **`http://localhost:8000/docs`**.
+
+---
+
+### 2. Frontend Setup
+
+1. Navigate to the `frontend` directory:
+   ```bash
+   cd frontend
+   ```
+
+2. Install Node dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Start the React development server:
+   ```bash
+   npm start
+   ```
+   > 🌐 The Web Application will automatically open at **`http://localhost:3000`**.
+
+---
+
+## 📡 API Reference Summary
+
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/v1/shorten` | Optional | Create a shortened URL with optional description |
+| `GET` | `/api/v1/{short_code}` | No | Redirect to original URL (increments click counter) |
+| `POST` | `/api/v1/auth/register` | No | Register a new user account |
+| `POST` | `/api/v1/auth/login` | No | Authenticate user and receive JWT access token |
+| `POST` | `/api/v1/auth/logout` | Yes | Invalidate user session |
+| `GET` | `/api/v1/auth/me` | Yes | Fetch currently authenticated user profile |
+| `GET` | `/api/v1/list/all` | Yes | List all shortened URLs owned by current user |
+| `GET` | `/api/v1/stats/{short_code}` | Yes | Get click analytics and metadata for a short link |
+| `PATCH` | `/api/v1/stats/{short_code}` | Yes | Update link metadata (description / expiration) |
+| `DELETE` | `/api/v1/stats/{short_code}` | Yes | Delete a shortened URL and its click logs |
+
+---
+
+<!-- ## 🐳 Docker Deployment (Optional)
+
+Run the full backend and database stack using Docker Compose:
+
 ```bash
-cd URL\ Shortner
+docker-compose up --build -d
 ```
 
-2. Create and sync the environment with `uv`:
-```bash
-uv sync
-```
+--- -->
 
-This creates the project virtual environment and installs dependencies from the root `pyproject.toml`.
+## 📝 License
 
-3. Create a `.env` file for the backend:
-```bash
-cp backend/.env.example backend/.env
-```
-
-4. Run the backend in development mode:
-```bash
-cd backend
-uv run fastapi dev
-```
-
-If you prefer running the app directly without the FastAPI CLI:
-```bash
-cd backend
-uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-The API will be available at `http://localhost:8000`.
-
-> If you are working only inside `backend/` and do not want to use the root project config, this also works:
-> ```bash
-> cd backend
-> uv venv
-> uv pip install -r requirements.txt
-> ```
-
-<!-- 6. Run with Docker Compose
-
-If you prefer Docker, start the backend and a Postgres DB using:
-```bash
-docker-compose up --build
-``` -->
-
-<!-- The backend service exposes port `8000` on the host. -->
-
-## Frontend Setup
-
-Coming soon...
-
-## API Endpoints
-
-- `POST /shorten` - Create a shortened URL
-- `GET /{short_code}` - Redirect to original URL
-- `GET /stats/{short_code}` - Get URL statistics
+This project is open-source under the [MIT License](LICENSE).

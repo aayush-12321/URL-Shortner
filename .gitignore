@@ -7,6 +7,10 @@ __pycache__/
 env/
 venv/
 ENV/
+.venv/
+*.egg-info/
+.installed.cfg
+*.egg
 build/
 develop-eggs/
 dist/
@@ -19,17 +23,13 @@ parts/
 sdist/
 var/
 wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-.venv
 
 # Environment
 .env
-.venv
-env
-venv
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # IDE
 .vscode/
@@ -42,11 +42,20 @@ venv
 *.db
 *.sqlite
 *.sqlite3
+backend/database.db
 
-# Node
+# Frontend & Node
 node_modules/
-npm-debug.log
-yarn-error.log
+frontend/node_modules/
+build/
+frontend/build/
+dist/
+frontend/dist/
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
 # OS
 .DS_Store
