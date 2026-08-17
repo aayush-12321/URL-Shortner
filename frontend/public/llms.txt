@@ -1,0 +1,19 @@
+# Shortlink URL Shortener
+
+> Free, fast, and secure URL shortener service to create compact links, custom aliases, and track link analytics in real-time.
+
+## Core Features & Use Cases
+- **Custom Slugs**: Create branded short URLs (e.g., `/my-brand`).
+- **Click Analytics**: Real-time click counter for link owners.
+- **Expiration Control**: Optional expiration dates and click limits for campaign links.
+- **REST API**: Programmatic link shortening for developers.
+
+## API Quickstart
+- POST `/api/v1/shorten`
+  - Body: `{"target_url": "https://example.com", "custom_slug": "my-alias"}`
+  - Returns: `{"short_code": "my-alias", "short_url": "https://yourdomain.com/my-alias"}`
+
+## Key Questions & Answers
+- What is Shortlink? A modern web application built with FastAPI and React for shortening long URLs into clean, shareable links.
+- Is it free? Yes, users can shorten links and manage them for free.
+- Does it support custom link aliases? Yes, users can specify custom short paths for their links.

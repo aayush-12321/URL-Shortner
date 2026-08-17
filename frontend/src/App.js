@@ -6,6 +6,11 @@ import ShortenForm from './components/ShortenForm';
 import UrlList from './components/UrlList';
 import EditUrlModal from './components/EditUrlModal';
 import Toast from './components/Toast';
+import Footer from './components/Footer';
+import HowItWorks from './components/HowItWorks';
+import Terms from './components/Terms';
+import Features from './components/Features';
+import ApiDocs from './components/ApiDocs';
 
 const API = axios.create({ baseURL: '/api/v1' });
 
@@ -35,6 +40,7 @@ function App() {
   const [urls, setUrls] = useState([]);
   const [latestResult, setLatestResult] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [currentPage, setCurrentPage] = useState('home'); // 'home' | 'features' | 'how-it-works' | 'api-docs' | 'terms'
 
   // Modal States
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login', loading: false, error: '' });
@@ -219,56 +225,85 @@ function App() {
     }
   };
 
+  const handleNavigate = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="app-container">
       <Navbar
         user={user}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
         onOpenAuth={handleOpenAuth}
         onLogout={handleLogout}
       />
 
       <main className="main-content">
-        <section className="hero">
-          <div className="hero-badge">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-            </svg>
-            URL Shortener Service
-          </div>
-          <h1 className="hero-title">Shorten, Share & Track Your Links</h1>
-          <p className="hero-subtitle">
-            Transform long, complex URLs into clean short links with instant click tracking and link management.
-          </p>
-        </section>
+        {currentPage === 'home' && (
+          <>
+            <section className="hero">
+              <div className="hero-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                URL Shortener Service
+              </div>
+              <h1 className="hero-title">Shorten, Share & Track Your Links</h1>
+              <p className="hero-subtitle">
+                Transform long, complex URLs into clean short links with instant click tracking and link management.
+              </p>
+            </section>
 
-        <ShortenForm
-          onShorten={handleShorten}
-          loading={shortenLoading}
-          latestResult={latestResult}
-          onCopyLink={handleCopyLink}
-        />
+            <ShortenForm
+              onShorten={handleShorten}
+              loading={shortenLoading}
+              latestResult={latestResult}
+              onCopyLink={handleCopyLink}
+            />
 
-        {!user ? (
-          <div className="guest-banner">
-            <div className="guest-banner-text">
-              <strong>Want to save and manage your links?</strong>
-              <p>Sign in or create a free account to track click counts, edit notes, and delete short links anytime.</p>
-            </div>
-            <button className="btn btn-primary btn-sm" onClick={() => handleOpenAuth('register')}>
-              Create Account
-            </button>
-          </div>
-        ) : (
-          <UrlList
-            urls={urls}
-            user={user}
-            onCopy={handleCopyLink}
-            onEdit={handleOpenEdit}
-            onDelete={handleDeleteLink}
-            onRefresh={() => fetchUrls(token)}
-          />
+            {!user ? (
+              <div className="guest-banner">
+                <div className="guest-banner-text">
+                  <strong>Want to save and manage your links?</strong>
+                  <p>Sign in or create a free account to track click counts, edit notes, and delete short links anytime.</p>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={() => handleOpenAuth('register')}>
+                  Create Account
+                </button>
+              </div>
+            ) : (
+              <UrlList
+                urls={urls}
+                user={user}
+                onCopy={handleCopyLink}
+                onEdit={handleOpenEdit}
+                onDelete={handleDeleteLink}
+                onRefresh={() => fetchUrls(token)}
+              />
+            )}
+          </>
+        )}
+
+        {currentPage === 'features' && (
+          <Features onNavigate={handleNavigate} onOpenAuth={handleOpenAuth} />
+        )}
+
+        {currentPage === 'how-it-works' && (
+          <HowItWorks onNavigate={handleNavigate} onOpenAuth={handleOpenAuth} />
+        )}
+
+        {currentPage === 'api-docs' && (
+          <ApiDocs onNavigate={handleNavigate} />
+        )}
+
+        {currentPage === 'terms' && (
+          <Terms onNavigate={handleNavigate} />
         )}
       </main>
+
+      <Footer currentPage={currentPage} onNavigate={handleNavigate} />
 
       <AuthModal
         isOpen={authModal.isOpen}

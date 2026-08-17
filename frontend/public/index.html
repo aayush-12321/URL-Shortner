@@ -4,14 +4,79 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0f172a" />
+    <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/favicon.svg" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/favicon.svg" />
+    
+    <!-- Primary Meta Tags -->
+    <title>URL Shortener | Fast, Free & Custom Link Shortener</title>
+    <meta name="title" content="URL Shortener | Fast, Free & Custom Link Shortener" />
     <meta
       name="description"
-      content="URL Shortener app built with React and FastAPI"
+      content="Create short, memorable links and custom URLs in seconds. Track click analytics with a fast, modern URL shortening web application."
     />
-    <title>URL Shortener</title>
+    <meta name="keywords" content="URL shortener, short links, link management, link analytics, custom short URL, free link shortener" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://yourdomain.com/" />
+
+    <!-- Open Graph / Facebook / LinkedIn -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://yourdomain.com/" />
+    <meta property="og:title" content="URL Shortener | Fast, Free & Custom Link Shortener" />
+    <meta property="og:description" content="Create short, memorable links and custom URLs in seconds. Track click analytics with a fast, modern URL shortening web application." />
+    <meta property="og:image" content="https://yourdomain.com/og-image.png" />
+
+    <!-- Twitter / X -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://yourdomain.com/" />
+    <meta property="twitter:title" content="URL Shortener | Fast, Free & Custom Link Shortener" />
+    <meta property="twitter:description" content="Create short, memorable links and custom URLs in seconds. Track click analytics with a fast, modern URL shortening web application." />
+    <meta property="twitter:image" content="https://yourdomain.com/og-image.png" />
+
+    <!-- AEO & GEO Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "URL Shortener",
+        "url": "https://yourdomain.com/",
+        "applicationCategory": "UtilityApplication",
+        "operatingSystem": "All",
+        "description": "Fast and secure URL shortener application allowing users to turn long URLs into custom short links with click tracking.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is a URL Shortener?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "A URL shortener transforms long web addresses into concise, easy-to-share links that redirect users to the original destination."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I customize my short URL?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, logged-in users can enter a custom slug or alias to create personalized short links."
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
   </body>
 </html>
+
