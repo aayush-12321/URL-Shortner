@@ -162,14 +162,19 @@ class URLService:
     
     @staticmethod
     def get_all_urls(session: Session, skip: int = 0, limit: int = 10) -> list[ShortenedURL]:
-        """Get all shortened URLs with pagination"""
+        """Get all shortened URLs with pagination (newest first)"""
         return session.exec(
-            select(ShortenedURL).offset(skip).limit(limit)
+            select(ShortenedURL).order_by(ShortenedURL.created_at.desc()).offset(skip).limit(limit)
         ).all()
 
     @staticmethod
     def get_urls_by_owner(session: Session, owner_id: int, skip: int = 0, limit: int = 10) -> list[ShortenedURL]:
-        """Get shortened URLs for a specific owner with pagination"""
+        """Get shortened URLs for a specific owner with pagination (newest first)"""
         return session.exec(
-            select(ShortenedURL).where(ShortenedURL.owner_id == owner_id).offset(skip).limit(limit)
+            select(ShortenedURL)
+            .where(ShortenedURL.owner_id == owner_id)
+            .order_by(ShortenedURL.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         ).all()
+
