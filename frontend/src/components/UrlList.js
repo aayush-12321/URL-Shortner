@@ -30,15 +30,38 @@ function UrlList({ urls, onCopy, onEdit, onDelete, onRefresh, user }) {
     );
   });
 
+  const parseUtcDate = (dateString) => {
+    if (!dateString) return null;
+    let str = String(dateString).trim().replace(' ', 'T');
+    if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-')) {
+      str += 'Z';
+    }
+    return new Date(str);
+  };
+
   const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
+    const date = parseUtcDate(dateString);
+    if (!date || isNaN(date.getTime())) return '';
     return date.toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
   };
+
+  const formatDateTime = (dateString) => {
+    const date = parseUtcDate(dateString);
+    if (!date || isNaN(date.getTime())) return '';
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+
 
   return (
     <section>
@@ -129,6 +152,15 @@ function UrlList({ urls, onCopy, onEdit, onDelete, onRefresh, user }) {
                         </span>
                       )}
                       {item.created_at && <span>Created {formatDate(item.created_at)}</span>}
+                      {item.expires_at && (() => {
+                        const expDate = parseUtcDate(item.expires_at);
+                        const isExpired = expDate ? expDate < new Date() : false;
+                        return (
+                          <span style={{ color: isExpired ? 'var(--accent-rose)' : 'var(--text-muted)' }}>
+                            Expires {formatDateTime(item.expires_at)} {isExpired ? '(Expired)' : ''}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
 

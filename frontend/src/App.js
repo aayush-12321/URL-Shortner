@@ -11,6 +11,8 @@ import HowItWorks from './components/HowItWorks';
 import Terms from './components/Terms';
 import Features from './components/Features';
 import ApiDocs from './components/ApiDocs';
+import ExpiredUrlModal from './components/ExpiredUrlModal';
+
 
 const API = axios.create({ baseURL: '/api/v1' });
 
@@ -41,11 +43,21 @@ function App() {
   const [latestResult, setLatestResult] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [currentPage, setCurrentPage] = useState('home'); // 'home' | 'features' | 'how-it-works' | 'api-docs' | 'terms'
+  const [expiredCode, setExpiredCode] = useState(null);
 
   // Modal States
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login', loading: false, error: '' });
   const [editModal, setEditModal] = useState({ isOpen: false, item: null, loading: false, error: '' });
   const [shortenLoading, setShortenLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'expired') {
+      const code = params.get('code');
+      setExpiredCode(code || 'link');
+    }
+  }, []);
+
 
   const addToast = useCallback((message, type = 'success') => {
     const id = Date.now() + Math.random();
@@ -321,6 +333,22 @@ function App() {
         onSave={handleSaveEdit}
         loading={editModal.loading}
         error={editModal.error}
+      />
+
+      <ExpiredUrlModal
+        isOpen={Boolean(expiredCode)}
+        code={expiredCode}
+        onClose={() => {
+          setExpiredCode(null);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }}
+        onCreateNew={() => {
+          setExpiredCode(null);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setCurrentPage('home');
+          const inputEl = document.querySelector('.shorten-input');
+          if (inputEl) inputEl.focus();
+        }}
       />
 
       <Toast toasts={toasts} />

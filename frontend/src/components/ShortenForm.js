@@ -3,16 +3,25 @@ import React, { useState } from 'react';
 function ShortenForm({ onShorten, loading, latestResult, onCopyLink }) {
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
   const [showOptional, setShowOptional] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!url.trim()) return;
-    const success = await onShorten({ original_url: url.trim(), description: description.trim() || undefined });
+
+    const payload = {
+      original_url: url.trim(),
+      description: description.trim() || undefined,
+      expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+    };
+
+    const success = await onShorten(payload);
     if (success) {
       setUrl('');
       setDescription('');
+      setExpiresAt('');
     }
   };
 
@@ -73,18 +82,36 @@ function ShortenForm({ onShorten, loading, latestResult, onCopyLink }) {
                 </>
               )}
             </svg>
-            {showOptional ? 'Hide optional note' : 'Add custom note or description'}
+            {showOptional ? 'Hide optional settings' : 'Add custom note or set link expiration'}
           </button>
 
           {showOptional && (
-            <div style={{ marginTop: '0.65rem' }}>
-              <input
-                type="text"
-                className="form-input form-input-simple"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Description/note (e.g. Marketing Campaign 2026)"
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginTop: '0.75rem' }}>
+              <div>
+                <label style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+                  Custom Description / Note
+                </label>
+                <input
+                  type="text"
+                  className="form-input form-input-simple"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Marketing Campaign 2026"
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+                  Link Expiration Date (Optional)
+                </label>
+                <input
+                  type="datetime-local"
+                  className="form-input form-input-simple"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                  style={{ colorScheme: 'dark' }}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -102,6 +129,11 @@ function ShortenForm({ onShorten, loading, latestResult, onCopyLink }) {
             >
               http://localhost:8000/api/v1/{latestResult.short_code}
             </a>
+            {latestResult.expires_at && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                Expires on: {new Date(latestResult.expires_at).toLocaleString()}
+              </span>
+            )}
           </div>
           <div className="result-actions">
             <button

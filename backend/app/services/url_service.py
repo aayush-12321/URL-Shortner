@@ -44,16 +44,11 @@ class URLService:
         """Create a new shortened URL"""
         short_code = URLService.generate_unique_short_code(session)
         
-        # Set expiration time
+        # Set expiration time if provided by user
         expires_at = url_create.expires_at
-        
-        # If no expiration provided, use default (current time + default_url_expiration_days)
-        if expires_at is None:
-            expires_at = datetime.now(timezone.utc) + timedelta(days=settings.default_url_expiration_days)
-        else:
-            # Ensure expires_at is timezone-aware if provided
-            if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at is not None and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
         
         shortened_url = ShortenedURL(
             original_url=url_create.original_url,

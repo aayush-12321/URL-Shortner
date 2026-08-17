@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session
 from app.database.db import get_session
@@ -11,6 +12,12 @@ from app.auth.security import get_current_user, get_current_user_optional
 router = APIRouter(prefix="/api/v1", tags=["urls"])
 
 
+def ensure_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 @router.post(
@@ -45,8 +52,9 @@ def create_shortened_url(
             short_code=shortened_url.short_code,
             original_url=shortened_url.original_url,
             click_count=shortened_url.click_count,
-            created_at=shortened_url.created_at,
-            description=shortened_url.description
+            created_at=ensure_utc(shortened_url.created_at),
+            description=shortened_url.description,
+            expires_at=ensure_utc(shortened_url.expires_at),
         )
     except Exception as e:
         raise HTTPException(
@@ -67,6 +75,7 @@ def create_shortened_url(
 )
 def redirect_to_original(
     short_code: str,
+    request: Request,
     session: Session = Depends(get_session)
 ):
     """
@@ -76,6 +85,12 @@ def redirect_to_original(
     original_url = URLService.get_original_url(session, short_code)
     
     if not original_url:
+        accept_header = request.headers.get("accept", "")
+        if "text/html" in accept_header:
+            return RedirectResponse(
+                url=f"http://localhost:3000/?error=expired&code={short_code}",
+                status_code=status.HTTP_307_TEMPORARY_REDIRECT
+            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Short code not found or URL has expired"
@@ -118,8 +133,9 @@ def get_url_stats(
         short_code=shortened_url.short_code,
         original_url=shortened_url.original_url,
         click_count=shortened_url.click_count,
-        created_at=shortened_url.created_at,
-        description=shortened_url.description
+        created_at=ensure_utc(shortened_url.created_at),
+        description=shortened_url.description,
+        expires_at=ensure_utc(shortened_url.expires_at),
     )
 
 
@@ -160,8 +176,9 @@ def update_url(
         short_code=updated_url.short_code,
         original_url=updated_url.original_url,
         click_count=updated_url.click_count,
-        created_at=updated_url.created_at,
+        created_at=ensure_utc(updated_url.created_at),
         description=updated_url.description,
+        expires_at=ensure_utc(updated_url.expires_at),
     )
 
 
@@ -226,8 +243,9 @@ def list_all_urls(
             short_code=url.short_code,
             original_url=url.original_url,
             click_count=url.click_count,
-            created_at=url.created_at,
+            created_at=ensure_utc(url.created_at),
             description=url.description,
+            expires_at=ensure_utc(url.expires_at),
         )
         for url in urls
     ]

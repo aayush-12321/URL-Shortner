@@ -61,6 +61,8 @@ class URLResponse(SQLModel):
     click_count: int
     created_at: datetime
     description: Optional[str] = None
+    expires_at: Optional[datetime] = None
+
 
 
 class URLUpdate(SQLModel):

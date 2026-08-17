@@ -23,7 +23,7 @@ function Footer({ currentPage, onNavigate }) {
           <h4 className="footer-heading">Navigation</h4>
           <ul className="footer-list">
             <li>
-              <button 
+              <button
                 className={`footer-link-btn ${currentPage === 'home' ? 'active' : ''}`}
                 onClick={() => onNavigate('home')}
               >
@@ -31,7 +31,7 @@ function Footer({ currentPage, onNavigate }) {
               </button>
             </li>
             <li>
-              <button 
+              <button
                 className={`footer-link-btn ${currentPage === 'features' ? 'active' : ''}`}
                 onClick={() => onNavigate('features')}
               >
@@ -39,7 +39,7 @@ function Footer({ currentPage, onNavigate }) {
               </button>
             </li>
             <li>
-              <button 
+              <button
                 className={`footer-link-btn ${currentPage === 'how-it-works' ? 'active' : ''}`}
                 onClick={() => onNavigate('how-it-works')}
               >
@@ -47,7 +47,7 @@ function Footer({ currentPage, onNavigate }) {
               </button>
             </li>
             <li>
-              <button 
+              <button
                 className={`footer-link-btn ${currentPage === 'api-docs' ? 'active' : ''}`}
                 onClick={() => onNavigate('api-docs')}
               >
@@ -55,7 +55,7 @@ function Footer({ currentPage, onNavigate }) {
               </button>
             </li>
             <li>
-              <button 
+              <button
                 className={`footer-link-btn ${currentPage === 'terms' ? 'active' : ''}`}
                 onClick={() => onNavigate('terms')}
               >
@@ -68,7 +68,7 @@ function Footer({ currentPage, onNavigate }) {
         <div className="footer-links-col">
           <h4 className="footer-heading">Product</h4>
           <ul className="footer-list">
-            <li><span className="footer-static-item">FastAPI + React Powered</span></li>
+            {/* <li><span className="footer-static-item">FastAPI + React Powered</span></li> */}
             <li><span className="footer-static-item">Real-Time Analytics</span></li>
             <li><span className="footer-static-item">Custom Slugs & Expiration</span></li>
           </ul>

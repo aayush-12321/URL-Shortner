@@ -1,19 +1,49 @@
 import React, { useState, useEffect } from 'react';
 
+const parseUtcDate = (dateString) => {
+  if (!dateString) return null;
+  let str = String(dateString).trim().replace(' ', 'T');
+  if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-')) {
+    str += 'Z';
+  }
+  return new Date(str);
+};
+
+const toLocalDatetimeString = (dateObj) => {
+  if (!dateObj || isNaN(dateObj.getTime())) return '';
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const hours = String(dateObj.getHours()).padStart(2, '0');
+  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
 function EditUrlModal({ isOpen, item, onClose, onSave, loading, error }) {
   const [description, setDescription] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
 
   useEffect(() => {
     if (item) {
       setDescription(item.description || '');
+      if (item.expires_at) {
+        const d = parseUtcDate(item.expires_at);
+        setExpiresAt(toLocalDatetimeString(d));
+      } else {
+        setExpiresAt('');
+      }
     }
   }, [item]);
+
 
   if (!isOpen || !item) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(item.short_code, { description: description.trim() });
+    onSave(item.short_code, {
+      description: description.trim(),
+      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+    });
   };
 
   return (
@@ -34,7 +64,7 @@ function EditUrlModal({ isOpen, item, onClose, onSave, loading, error }) {
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>
               SHORT CODE
             </span>
-            <div style={{ fontFamily: 'JetBrains Mono', fontWeight: '700', color: '#A5B4FC' }}>
+            <div style={{ fontFamily: 'JetBrains Mono', fontWeight: '700', color: 'var(--accent-emerald)' }}>
               {item.short_code}
             </div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.35rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -65,6 +95,17 @@ function EditUrlModal({ isOpen, item, onClose, onSave, loading, error }) {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Campaign name or note..."
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Link Expiration Date & Time (Optional)</label>
+              <input
+                type="datetime-local"
+                className="form-input form-input-simple"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+                style={{ colorScheme: 'dark' }}
               />
             </div>
 
