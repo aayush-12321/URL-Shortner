@@ -55,7 +55,8 @@ URL Shortener/
 │   │   ├── routes/        # URL shorten, list, stats, edit, & delete endpoints
 │   │   ├── services/      # Business logic & click tracking service
 │   │   └── main.py        # FastAPI app entry point & CORS configuration
-│   └── database.db        # SQLite database storage
+│   └── data/      
+        ├── database.db    # SQLite database storage
 └── frontend/              # React Frontend Web App
     ├── public/            # Public assets & HTML template
     └── src/
@@ -137,15 +138,28 @@ URL Shortener/
 
 ---
 
-<!-- ## 🐳 Docker Deployment (Optional)
+## 🐳 Docker Deployment (Optional)
 
-Run the full backend and database stack using Docker Compose:
+Build the Docker image:
 
 ```bash
-docker-compose up --build -d
+docker build -t url-shortener .
 ```
 
---- -->
+Create a Docker volume for persistent database storage:
+
+```bash
+docker volume create url-shortener-data
+```
+
+Run the application using your `.env` file and the persistent volume:
+
+```bash
+docker run --env-file .env -p 8000:8000 -v url-shortener-data:/app/data url-shortener
+```
+
+The SQLite database is stored in `data/` and persists in the `url-shortener-data` Docker volume.
+---
 
 ## 📝 License
 
