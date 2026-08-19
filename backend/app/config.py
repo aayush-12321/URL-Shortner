@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = "sqlite:///./database.db"
+    database_url: str = "sqlite:///./data/database.db"
 
     # Security
     secret_key: str = Field(..., min_length=32)
