@@ -36,19 +36,33 @@ const getErrorMessage = (err, fallback = 'An unexpected error occurred.') => {
   return String(detail);
 };
 
+const getPageFromHash = () => {
+  const hash = window.location.hash.replace('#', '').trim();
+  const validPages = ['home', 'features', 'how-it-works', 'api-docs', 'terms'];
+  return validPages.includes(hash) ? hash : 'home';
+};
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [user, setUser] = useState(null);
   const [urls, setUrls] = useState([]);
   const [latestResult, setLatestResult] = useState(null);
   const [toasts, setToasts] = useState([]);
-  const [currentPage, setCurrentPage] = useState('home'); // 'home' | 'features' | 'how-it-works' | 'api-docs' | 'terms'
+  const [currentPage, setCurrentPage] = useState(getPageFromHash); // 'home' | 'features' | 'how-it-works' | 'api-docs' | 'terms'
   const [expiredCode, setExpiredCode] = useState(null);
 
   // Modal States
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login', loading: false, error: '' });
   const [editModal, setEditModal] = useState({ isOpen: false, item: null, loading: false, error: '' });
   const [shortenLoading, setShortenLoading] = useState(false);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentPage(getPageFromHash());
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -239,6 +253,13 @@ function App() {
 
   const handleNavigate = (page) => {
     setCurrentPage(page);
+    if (page === 'home') {
+      if (window.location.hash) {
+        window.history.pushState(null, '', window.location.pathname + window.location.search);
+      }
+    } else {
+      window.location.hash = page;
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
