@@ -21,4 +21,4 @@ Allow: /
 User-agent: Applebot-Extended
 Allow: /
 
-Sitemap: https://yourdomain.com/sitemap.xml
+Sitemap: https://url-shortener.parajuliaayush.com.np/sitemap.xml
