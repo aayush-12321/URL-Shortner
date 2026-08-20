@@ -3,14 +3,14 @@ import React, { useState } from 'react';
 function ApiDocs({ onNavigate }) {
   const [activeTab, setActiveTab] = useState('curl');
 
-  const curlExample = `curl -X POST "https://yourdomain.com/api/v1/shorten" \\
+  const curlExample = `curl -X POST "${process.env.REACT_APP_API_BASE_URL}/shorten" \\
   -H "Content-Type: application/json" \\
   -d '{
     "target_url": "https://example.com/very-long-article-url",
     "custom_slug": "my-custom-link"
   }'`;
 
-  const jsExample = `fetch('https://yourdomain.com/api/v1/shorten', {
+  const jsExample = `fetch('${process.env.REACT_APP_API_BASE_URL}/shorten', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -24,7 +24,7 @@ function ApiDocs({ onNavigate }) {
   const pythonExample = `import requests
 
 response = requests.post(
-    "https://yourdomain.com/api/v1/shorten",
+    "${process.env.REACT_APP_API_BASE_URL}/shorten",
     json={
         "target_url": "https://example.com/very-long-article-url",
         "custom_slug": "my-custom-link"
@@ -96,7 +96,7 @@ print(response.json())`;
           }}>
 {`{
   "short_code": "my-custom-link",
-  "short_url": "https://yourdomain.com/my-custom-link",
+  "short_url": "${process.env.REACT_APP_API_BASE_URL}/my-custom-link",
   "target_url": "https://example.com/very-long-article-url",
   "clicks_count": 0,
   "created_at": "2026-08-17T22:00:00Z"

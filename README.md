@@ -1,12 +1,23 @@
-# 🔗 Shortlink — Modern URL Shortener & Analytics
+# 🔗 Shortlink : Modern URL Shortener & Analytics
 
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/Frontend-React_18-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python)](https://www.python.org/)
+[![Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://url-shortener.parajuliaayush.com.np/)
+[![Railway](https://img.shields.io/badge/Backend-Railway-0B0D0E?style=flat-square&logo=railway&logoColor=white)](https://go.parajuliaayush.com.np/)
+[![Docker](https://img.shields.io/badge/Container-Docker-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
 [![uv](https://img.shields.io/badge/Package_Manager-uv-DE5B8B?style=flat-square)](https://github.com/astral-sh/uv)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
 A high-performance, full-stack URL shortening service with real-time click tracking, custom link descriptions, user authentication, and a clean, grounded dashboard UI.
+
+## 🌐 Live Deployment
+
+- **Web app**: [url-shortener.parajuliaayush.com.np](https://url-shortener.parajuliaayush.com.np/)
+- **API server**: [go.parajuliaayush.com.np](https://go.parajuliaayush.com.np/)
+- **API base path**: `https://go.parajuliaayush.com.np/api/v1`
+
+Including the backend URL in the README is recommended. It helps users understand the deployment architecture, test the API, and configure the frontend when the backend is hosted on a different origin.
 
 ---
 
