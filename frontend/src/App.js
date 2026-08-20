@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
+import { Analytics } from '@vercel/analytics/react';
 import Navbar from './components/Navbar';
 import AuthModal from './components/AuthModal';
 import ShortenForm from './components/ShortenForm';
@@ -374,6 +375,7 @@ function App() {
       />
 
       <Toast toasts={toasts} />
+      <Analytics />
     </div>
   );
 }
