@@ -12,9 +12,10 @@ import Terms from './components/Terms';
 import Features from './components/Features';
 import ApiDocs from './components/ApiDocs';
 import ExpiredUrlModal from './components/ExpiredUrlModal';
+import { API_BASE_URL } from './config';
 
 
-const API = axios.create({ baseURL: '/api/v1' });
+const API = axios.create({ baseURL: API_BASE_URL });
 
 // Helper to safely extract error message from API response (e.g. FastAPI / Pydantic validation errors)
 const getErrorMessage = (err, fallback = 'An unexpected error occurred.') => {

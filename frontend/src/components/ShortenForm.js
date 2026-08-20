@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getShortUrl } from '../config';
 
 function ShortenForm({ onShorten, loading, latestResult, onCopyLink }) {
   const [url, setUrl] = useState('');
@@ -27,7 +28,7 @@ function ShortenForm({ onShorten, loading, latestResult, onCopyLink }) {
 
   const handleCopy = () => {
     if (!latestResult) return;
-    const fullShortUrl = `http://localhost:8000/api/v1/${latestResult.short_code}`;
+    const fullShortUrl = getShortUrl(latestResult.short_code);
     onCopyLink(fullShortUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -121,14 +122,19 @@ function ShortenForm({ onShorten, loading, latestResult, onCopyLink }) {
         <div className="result-box">
           <div className="result-info">
             <span className="result-label">✨ Link Ready!</span>
+            {(() => {
+              const fullShortUrl = getShortUrl(latestResult.short_code);
+              return (
             <a
-              href={`http://localhost:8000/api/v1/${latestResult.short_code}`}
+              href={fullShortUrl}
               target="_blank"
               rel="noreferrer"
               className="result-url"
             >
-              http://localhost:8000/api/v1/{latestResult.short_code}
+              {fullShortUrl}
             </a>
+              );
+            })()}
             {latestResult.expires_at && (
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                 Expires on: {new Date(latestResult.expires_at).toLocaleString()}
@@ -164,7 +170,7 @@ function ShortenForm({ onShorten, loading, latestResult, onCopyLink }) {
             </button>
 
             <a
-              href={`http://localhost:8000/api/v1/${latestResult.short_code}`}
+              href={getShortUrl(latestResult.short_code)}
               target="_blank"
               rel="noreferrer"
               className="btn btn-secondary btn-sm"

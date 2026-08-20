@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getShortUrl } from '../config';
 
 function UrlList({ urls, onCopy, onEdit, onDelete, onRefresh, user }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -6,7 +7,7 @@ function UrlList({ urls, onCopy, onEdit, onDelete, onRefresh, user }) {
   const [deletingCode, setDeletingCode] = useState(null);
 
   const handleCopyClick = (shortCode) => {
-    const fullUrl = `http://localhost:8000/api/v1/${shortCode}`;
+    const fullUrl = getShortUrl(shortCode);
     onCopy(fullUrl);
     setCopiedCode(shortCode);
     setTimeout(() => setCopiedCode(null), 2000);
@@ -114,7 +115,7 @@ function UrlList({ urls, onCopy, onEdit, onDelete, onRefresh, user }) {
           {filteredUrls.map((item) => {
             const isCopied = copiedCode === item.short_code;
             const isDeleting = deletingCode === item.short_code;
-            const fullShortUrl = `http://localhost:8000/api/v1/${item.short_code}`;
+            const fullShortUrl = getShortUrl(item.short_code);
 
             return (
               <div className="url-card" key={item.short_code}>
@@ -127,7 +128,7 @@ function UrlList({ urls, onCopy, onEdit, onDelete, onRefresh, user }) {
                         rel="noreferrer"
                         className="short-link"
                       >
-                        http://localhost:8000/api/v1/{item.short_code}
+                        {fullShortUrl}
                       </a>
                       <span className="click-tag">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

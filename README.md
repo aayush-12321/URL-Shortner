@@ -13,6 +13,8 @@ A high-performance, full-stack URL shortening service with real-time click track
 ## ✨ Features
 
 - ⚡ **Instant URL Shortening**: Convert long, messy links into clean short URLs in milliseconds.
+- 🐳 **Dockerized Deployment**: Package and run the FastAPI application consistently with Docker.
+- 🚀 **Automated GitHub → Railway Deployment**: Deploy changes automatically from GitHub to Railway.
 - 🔒 **User Authentication**: Secure JWT-based registration and login via sleek popup modals.
 - 📋 **Link Dashboard**: View all your shortened URLs with real-time click counters and creation timestamps.
 - ✏️ **Full Link Management**:
@@ -28,16 +30,28 @@ A high-performance, full-stack URL shortening service with real-time click track
 
 ## 🏗️ Tech Stack
 
-### **Backend**
-- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.12+)
-- **Database & ORM**: [SQLModel](https://sqlmodel.tiangolo.com/) + SQLite / PostgreSQL
-- **Auth & Security**: OAuth2 with Password Hashing (Bcrypt) & JWT Tokens
-- **Package Management**: [uv](https://github.com/astral-sh/uv)
+- Python 3.12+
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [SQLModel](https://sqlmodel.tiangolo.com/)
+- SQLite
+- JWT authentication
+- Docker
+- [uv](https://github.com/astral-sh/uv)
+- [Railway](https://railway.com/)
+- React 18 with Axios and vanilla CSS for the frontend
 
-### **Frontend**
-- **Framework**: [React 18](https://react.dev/)
-- **HTTP Client**: [Axios](https://axios-http.com/)
-- **Styling**: Vanilla CSS Design System (Custom Variables, Modern Typography, Responsive Grid)
+## 🧩 Architecture
+
+The project is split into a React frontend and a FastAPI backend. The frontend communicates with the backend over the `/api/v1` REST API. FastAPI handles authentication, URL management, redirects, and analytics; SQLModel persists application data in SQLite. The Docker image runs the backend with `uvicorn`, while `/app/data` is mounted to persistent storage in production.
+
+```text
+React frontend
+   │ REST API (/api/v1)
+   ▼
+FastAPI backend ── SQLModel ── SQLite (/app/data)
+   │
+   └── JWT authentication and URL analytics
+```
 
 ---
 
@@ -67,7 +81,7 @@ URL Shortener/
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Running Locally
 
 ### Prerequisites
 - **Python 3.12+**
@@ -76,7 +90,7 @@ URL Shortener/
 
 ---
 
-### 1. Backend Setup
+### Backend
 
 1. Navigate to the project root and install Python dependencies:
    ```bash
@@ -101,7 +115,7 @@ URL Shortener/
 
 ---
 
-### 2. Frontend Setup
+### Frontend
 
 1. Navigate to the `frontend` directory:
    ```bash
@@ -118,6 +132,19 @@ URL Shortener/
    npm start
    ```
    > 🌐 The Web Application will automatically open at **`http://localhost:3000`**.
+
+By default, the frontend uses the relative `/api/v1` path, which works with the
+development proxy and with a reverse proxy serving the frontend and backend
+together. If the backend is hosted on a different origin, create
+`frontend/.env.local` with:
+
+```env
+REACT_APP_API_BASE_URL=https://api.example.com/api/v1
+```
+
+Restart the frontend after changing this value. React environment variables
+are read when the app is built, so the value must be provided during deployment
+as well.
 
 ---
 
@@ -138,7 +165,7 @@ URL Shortener/
 
 ---
 
-## 🐳 Docker Deployment (Optional)
+## 🐳 Running with Docker
 
 Build the Docker image:
 
