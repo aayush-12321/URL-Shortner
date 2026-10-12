@@ -1,11 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 # Import models to register them with SQLModel
 from app.models.models import ShortenedURL, ClickLog, User  # noqa: F401
 
 # Import database setup
+from app.database import db
 from app.database.db import create_db_and_tables
 
 # Import routes
@@ -58,8 +62,24 @@ def read_root():
     }
 
 
-@app.get("/health")
-def health_check():
-    return {"status": "healthy"}
+@app.get(
+    "/health",
+    responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "A required dependency is unavailable"}},
+)
+def health_check() -> JSONResponse:
+    """Report service readiness by checking the database connection."""
+    try:
+        with db.engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "unhealthy", "checks": {"database": "unhealthy"}},
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"status": "healthy", "checks": {"database": "healthy"}},
+    )
 
 
