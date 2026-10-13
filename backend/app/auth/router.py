@@ -117,17 +117,93 @@ def send_verification_email(email: str, code: str) -> None:
         {
             "from": settings.EMAIL_FROM,
             "to": [email],
-            "subject": "Verify your URL Shortener email",
+            "subject": "Verify your email address | ShortLink URL Shortener",
             "text": (
-                f"Your URL Shortener verification code is {code}. "
-                f"It expires in {OTP_EXPIRY_MINUTES} minutes."
+                f"Welcome to ShortLink URL Shortener!\n\n"
+                f"Use the verification code below to complete your registration:\n\n"
+                f"{code}\n\n"
+                f"This code expires in {OTP_EXPIRY_MINUTES} minutes.\n\n"
+                "If you did not try to create a URL Shortener account, "
+                "you can safely ignore this email.\n\n"
+                "The URL Shortener Team"
             ),
-            "html": (
-                "<p>Use this verification code to finish creating your account:</p>"
-                f"<p style=\"font-size:24px;font-weight:bold;letter-spacing:4px\">{code}</p>"
-                f"<p>This code expires in {OTP_EXPIRY_MINUTES} minutes.</p>"
-            ),
+            "html": f"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <body style="margin:0;padding:0;background-color:#f4f6f8;
+                        font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+                <div style="max-width:520px;margin:40px auto;padding:0 16px;">
+                    <div style="background:#ffffff;border:1px solid #e5e7eb;
+                                border-radius:12px;overflow:hidden;">
+
+                        <div style="background:#0B0D0E;padding:24px 28px;">
+                            <h1 style="margin:0;color:#ffffff;font-size:22px;
+                                    font-weight:600;">
+                                URL Shortener
+                            </h1>
+                        </div>
+
+                        <div style="padding:32px 28px;">
+                            <h2 style="margin:0 0 16px;font-size:22px;
+                                    color:#111827;">
+                                Verify your email address
+                            </h2>
+
+                            <p style="font-size:15px;line-height:1.7;
+                                    color:#4b5563;">
+                                Welcome! Enter the verification code below
+                                to complete your registration.
+                            </p>
+
+                            <div style="margin:28px 0;padding:22px 12px;
+                                        background:#f9fafb;border:1px solid #e5e7eb;
+                                        border-radius:8px;text-align:center;">
+                                <p style="margin:0 0 10px;font-size:12px;
+                                        color:#6b7280;text-transform:uppercase;
+                                        letter-spacing:1.5px;">
+                                    Your verification code
+                                </p>
+                                <div style="font-size:32px;font-weight:700;
+                                            letter-spacing:8px;color:#111827;">
+                                    {code}
+                                </div>
+                            </div>
+
+                            <p style="font-size:14px;line-height:1.6;
+                                    color:#4b5563;">
+                                This code expires in
+                                <strong>{OTP_EXPIRY_MINUTES} minutes</strong>.
+                                For your security, do not share it with anyone.
+                            </p>
+
+                            <hr style="border:none;border-top:1px solid #e5e7eb;
+                                    margin:28px 0;">
+
+                            <p style="font-size:13px;line-height:1.6;
+                                    color:#6b7280;">
+                                Didn't request an account? You can safely
+                                ignore this email.
+                            </p>
+
+                            <p style="margin:24px 0 0;font-size:14px;
+                                    color:#374151;">
+                                Thanks,<br>
+                                <strong>The ShortLink URL Shortener Team</strong>
+                            </p>
+                        </div>
+                    </div>
+
+                    <p style="margin:18px 0;text-align:center;font-size:12px;
+                            color:#9ca3af;">
+                        Automated message from URL Shortener. Please do not
+                        reply to this email.
+                    </p>
+                </div>
+            </body>
+            </html>
+            """,
         }
+
     )
 
 
