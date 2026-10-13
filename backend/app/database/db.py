@@ -46,14 +46,17 @@ def create_db_and_tables():
 
     if "image_url" not in user_columns:
         with engine.begin() as connection:
-            connection.execute(
-                text("ALTER TABLE user ADD COLUMN image_url VARCHAR")
+           connection.execute(
+                text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS image_url VARCHAR')
             )
 
     if "email_verified" not in user_columns:
         with engine.begin() as connection:
             connection.execute(
-                text("ALTER TABLE user ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT TRUE")
+                text(
+                    'ALTER TABLE "user" '
+                    'ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE'
+                )
             )
 
 
