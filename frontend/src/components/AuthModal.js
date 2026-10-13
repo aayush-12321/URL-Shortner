@@ -1,7 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 
-function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, onGoogleCredential, loading, error }) {
+function AuthModal({
+  isOpen,
+  initialMode = 'login',
+  verificationEmail,
+  resendAfterSeconds = 0,
+  onClose,
+  onSubmit,
+  onVerifyEmail,
+  onResendVerification,
+  onChangePendingEmail,
+  onGoogleCredential,
+  loading,
+  error,
+}) {
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({
     username: '',
@@ -12,20 +25,53 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, onGoogleC
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [formError, setFormError] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [emailEdit, setEmailEdit] = useState('');
+  const [resendCountdown, setResendCountdown] = useState(0);
   const [googleError, setGoogleError] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
   const googleButtonRef = useRef(null);
   const googleCredentialHandler = useRef(onGoogleCredential);
+  const isVerificationStep = mode === 'verify' || mode === 'change-email';
 
   googleCredentialHandler.current = onGoogleCredential;
 
   useEffect(() => {
+    if (!isOpen) {
+      setMode(initialMode);
+      setForm({ username: '', email: '', password: '', confirmPassword: '' });
+      setPasswordVisible(false);
+      setConfirmPasswordVisible(false);
+      setVerificationCode('');
+      setEmailEdit('');
+      setFormError('');
+      setResendCountdown(0);
+      return;
+    }
     setMode(initialMode);
-    setForm({ username: '', email: '', password: '', confirmPassword: '' });
-    setPasswordVisible(false);
-    setConfirmPasswordVisible(false);
+    if (initialMode !== 'verify') {
+      setForm({ username: '', email: '', password: '', confirmPassword: '' });
+      setPasswordVisible(false);
+      setConfirmPasswordVisible(false);
+    }
+    setVerificationCode('');
     setFormError('');
   }, [initialMode, isOpen]);
+
+  useEffect(() => {
+    if (!verificationEmail || resendAfterSeconds <= 0) {
+      setResendCountdown(0);
+      return;
+    }
+    setResendCountdown(resendAfterSeconds);
+  }, [verificationEmail, resendAfterSeconds]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setResendCountdown((remaining) => Math.max(0, remaining - 1));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -39,7 +85,7 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, onGoogleC
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isOpen || isVerificationStep) return undefined;
 
     let cancelled = false;
     setGoogleError('');
@@ -95,7 +141,7 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, onGoogleC
 
     loadGoogleButton();
     return () => { cancelled = true; };
-  }, [isOpen]);
+  }, [isOpen, isVerificationStep]);
 
   if (!isOpen) return null;
 
@@ -106,21 +152,56 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, onGoogleC
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (mode === 'change-email') {
+      const nextEmail = emailEdit.trim();
+      if (!nextEmail) {
+        setFormError('Enter the new email address.');
+        return;
+      }
+      if (nextEmail.toLowerCase() === verificationEmail.toLowerCase()) {
+        setMode('verify');
+        setFormError('');
+        return;
+      }
+      if (!form.password) {
+        setFormError('Please return to sign-up and create the verification request again.');
+        return;
+      }
+      setFormError('');
+      const cooldown = await onChangePendingEmail(verificationEmail, nextEmail, form.password);
+      if (Number.isFinite(cooldown)) {
+        setMode('verify');
+        setResendCountdown(cooldown);
+      }
+      return;
+    }
+    if (mode === 'verify') {
+      if (!/^\d{6}$/.test(verificationCode)) {
+        setFormError('Enter the six-digit code from your email.');
+        return;
+      }
+      setFormError('');
+      await onVerifyEmail(verificationEmail, verificationCode);
+      return;
+    }
     if (mode === 'register' && form.password !== form.confirmPassword) {
       setFormError('Passwords do not match.');
       return;
     }
     setFormError('');
-    onSubmit(mode, form);
+    const result = await onSubmit(mode, form);
+    if (mode === 'register' && result) setVerificationCode('');
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-container" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">{mode === 'login' ? 'Welcome Back' : 'Create Account'}</h3>
+          <h3 className="modal-title">
+            {mode === 'verify' ? 'Verify your email' : mode === 'change-email' ? 'Change email address' : mode === 'login' ? 'Welcome Back' : 'Create Account'}
+          </h3>
           <button className="modal-close" onClick={onClose}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -130,26 +211,30 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, onGoogleC
         </div>
 
         <div className="modal-body">
-          <div className="modal-tabs">
-            <button
-              className={`tab-btn ${mode === 'login' ? 'active' : ''}`}
-              onClick={() => { setMode('login'); setFormError(''); }}
-            >
-              Log In
-            </button>
-            <button
-              className={`tab-btn ${mode === 'register' ? 'active' : ''}`}
-              onClick={() => { setMode('register'); setFormError(''); }}
-            >
-              Sign Up
-            </button>
-          </div>
+          {!isVerificationStep && (
+            <div className="modal-tabs">
+              <button
+                className={`tab-btn ${mode === 'login' ? 'active' : ''}`}
+                onClick={() => { setMode('login'); setFormError(''); }}
+              >
+                Log In
+              </button>
+              <button
+                className={`tab-btn ${mode === 'register' ? 'active' : ''}`}
+                onClick={() => { setMode('register'); setFormError(''); }}
+              >
+                Sign Up
+              </button>
+            </div>
+          )}
 
-          <div style={{ margin: '0.25rem 0 1.25rem', textAlign: 'center' }}>
-            <div ref={googleButtonRef} style={{ display: 'flex', justifyContent: 'center', minHeight: '40px' }} />
-            {googleLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Loading Google sign-in…</span>}
-            {googleError && <div role="alert" style={{ color: '#F43F5E', fontSize: '0.8rem', marginTop: '0.5rem' }}>{googleError}</div>}
-          </div>
+          {!isVerificationStep && (
+            <div style={{ margin: '0.25rem 0 1.25rem', textAlign: 'center' }}>
+              <div ref={googleButtonRef} style={{ display: 'flex', justifyContent: 'center', minHeight: '40px' }} />
+              {googleLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Loading Google sign-in…</span>}
+              {googleError && <div role="alert" style={{ color: '#F43F5E', fontSize: '0.8rem', marginTop: '0.5rem' }}>{googleError}</div>}
+            </div>
+          )}
 
           {(formError || error) && (
             <div style={{
@@ -165,6 +250,111 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, onGoogleC
             </div>
           )}
 
+          {mode === 'verify' ? (
+            <form onSubmit={handleSubmit}>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', textAlign: 'center' }}>
+                Enter the six-digit code sent to <strong style={{ color: 'var(--text-main)' }}>{verificationEmail}</strong>.
+                The code expires in 10 minutes.
+              </p>
+              <div className="form-group">
+                <label htmlFor="verification-code">Verification code</label>
+                <input
+                  id="verification-code"
+                  type="text"
+                  className="form-input form-input-simple"
+                  value={verificationCode}
+                  onChange={(e) => {
+                    setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                    setFormError('');
+                  }}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: '0.5rem' }}
+                disabled={loading}
+              >
+                {loading ? 'Verifying...' : 'Verify email'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ width: '100%', marginTop: '0.5rem' }}
+                onClick={async () => {
+                  const cooldown = await onResendVerification(verificationEmail);
+                  if (Number.isFinite(cooldown)) setResendCountdown(cooldown);
+                }}
+                disabled={loading || resendCountdown > 0}
+              >
+                {resendCountdown > 0
+                  ? `Resend code in ${Math.floor(resendCountdown / 60)}:${String(resendCountdown % 60).padStart(2, '0')}`
+                  : 'Resend verification code'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ width: '100%', marginTop: '0.25rem' }}
+                onClick={() => {
+                  setEmailEdit(verificationEmail);
+                  setFormError('');
+                  setMode('change-email');
+                }}
+                disabled={loading}
+              >
+                Change email address
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ width: '100%', marginTop: '0.25rem' }}
+                onClick={onClose}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            </form>
+          ) : mode === 'change-email' ? (
+            <form onSubmit={handleSubmit}>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', textAlign: 'center' }}>
+                Update the address for this pending account. A new code will be sent to the changed address. If you keep the same address, your current code remains valid.
+              </p>
+              <div className="form-group">
+                <label htmlFor="updated-email">Email address</label>
+                <input
+                  id="updated-email"
+                  type="email"
+                  className="form-input form-input-simple"
+                  value={emailEdit}
+                  onChange={(e) => setEmailEdit(e.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: '0.5rem' }}
+                disabled={loading}
+              >
+                {loading ? 'Updating...' : 'Save email address'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ width: '100%', marginTop: '0.5rem' }}
+                onClick={() => { setMode('verify'); setFormError(''); }}
+                disabled={loading}
+              >
+                Back to code
+              </button>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Username</label>
@@ -287,6 +477,7 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, onGoogleC
               )}
             </button>
           </form>
+          )}
         </div>
       </div>
     </div>

@@ -12,7 +12,18 @@ class User(SQLModel, table=True):
     email: EmailStr = Field(unique=True, index=True)
     hashed_password: str
     image_url: str | None = Field(default=None)
+    email_verified: bool = Field(default=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class EmailVerification(SQLModel, table=True):
+    """Pending email verification state; OTPs are stored only as keyed hashes."""
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", unique=True, index=True)
+    otp_hash: str
+    expires_at: datetime
+    attempts: int = Field(default=0)
+    last_sent_at: datetime
 
 
 class UserCreate(SQLModel):
@@ -42,6 +53,34 @@ class UserRead(SQLModel):
     email: EmailStr
     image_url: str | None = None
     created_at: datetime
+
+
+class EmailVerificationRequest(SQLModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
+
+    @model_validator(mode="after")
+    def code_is_numeric(self):
+        if not self.code.isdigit():
+            raise ValueError("Verification code must contain only digits.")
+        return self
+
+
+class EmailResendRequest(SQLModel):
+    email: EmailStr
+
+
+class EmailChangeRequest(SQLModel):
+    email: EmailStr
+    new_email: EmailStr
+    password: str = Field(min_length=8, max_length=72)
+
+
+class EmailVerificationResponse(SQLModel):
+    message: str
+    email: EmailStr
+    expires_in_seconds: int
+    resend_after_seconds: int = 60
 
 
 class ShortenedURL(SQLModel, table=True):

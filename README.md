@@ -5,6 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python)](https://www.python.org/)
 [![Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://url-shortener.parajuliaayush.com.np/)
 [![Backend](https://img.shields.io/badge/Backend-API-0B0D0E?style=flat-square&logo=fastapi&logoColor=white)](https://go.parajuliaayush.com.np/)
+[![Google Authentication](https://img.shields.io/badge/Google-Authentication-4285F4?style=flat-square&logo=google&logoColor=)](https://go.parajuliaayush.com.np/)
 [![Render](https://img.shields.io/badge/Deployed_on-Render-46E3B7?style=flat-square&logo=render&logoColor=white)](YOUR_RENDER_BACKEND_URL)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
 [![uv](https://img.shields.io/badge/Package_Manager-uv-DE5B8B?style=flat-square)](https://github.com/astral-sh/uv)
@@ -27,7 +28,7 @@ Including the backend URL in the README is recommended. It helps users understan
 - ⚡ **Instant URL Shortening**: Convert long, messy links into clean short URLs in milliseconds.
 - 🐳 **Dockerized Deployment**: Package and run the FastAPI application consistently with Docker.
 - 🚀 **Container-Ready Deployment**: The app is designed to run in Docker and is currently deployed on Render for the backend while the frontend is served on Vercel.
-- 🔒 **User Authentication**: Secure JWT-based registration and login via sleek popup modals.
+- 🔒 **User Authentication**: Register with email and verify it using an OTP, or sign in with Google. Authenticated users receive secure JWT-based access.
 - 📋 **Link Dashboard**: View all your shortened URLs with real-time click counters and creation timestamps.
 - ✏️ **Full Link Management**:
   - One-click **Copy to Clipboard** with instant visual confirmation.
@@ -46,7 +47,7 @@ Including the backend URL in the README is recommended. It helps users understan
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [SQLModel](https://sqlmodel.tiangolo.com/)
 - SQLite by default, with `DATABASE_URL` override support
-- JWT authentication
+- JWT authentication, Google OAuth, and email OTP verification via Resend
 - Docker
 - [uv](https://github.com/astral-sh/uv)
 - React 18 with Axios and vanilla CSS for the frontend
@@ -61,7 +62,7 @@ React frontend
    ▼
 FastAPI backend ── SQLModel ── SQLite by default (/app/data)
    │
-   └── JWT authentication and URL analytics
+   └── JWT authentication, Google OAuth, and email OTP verification and URL analytics
 ```
 
 ---
@@ -166,6 +167,25 @@ REACT_APP_API_BASE_URL=https://api.example.com/api/v1
 Restart the frontend after changing this value. React environment variables
 are read when the app is built, so the value must be provided during deployment
 as well.
+
+---
+
+## 🔐 Authentication
+
+The app supports Google sign-in and email registration with OTP verification.
+
+### Google Sign-In
+
+1. Create OAuth credentials in the [Google Cloud Console](https://console.cloud.google.com/).
+2. Add the Google OAuth client ID and client secret to the backend `.env` file.
+
+### Email Registration
+
+1. Email registration requires verification with a one-time password (OTP).
+2. The OTP is sent using [Resend](https://resend.com/). Create a Resend API key
+   and add it to the backend `.env` file so the app can send verification emails.
+
+Keep these credentials private and do not commit the `.env` file.
 
 ---
 

@@ -1,11 +1,15 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import app.auth.router as auth_router
+from app.config import settings
 from sqlmodel import Session, select
 
 from app import database as db_module
 from app.auth.security import get_password_hash, verify_password
-from app.models.models import ShortenedURL
+from app.models.models import EmailVerification, ShortenedURL, User
+
+_send_verification_email = auth_router.send_verification_email
 
 
 def _random_user(prefix: str = "user") -> tuple[str, str, str]:
@@ -14,6 +18,25 @@ def _random_user(prefix: str = "user") -> tuple[str, str, str]:
     email = f"{username}@example.com"
     password = "StrongPass123!"
     return username, email, password
+
+
+def _register_and_verify(client, user: tuple[str, str, str], sent_codes: dict[str, str]) -> None:
+    username, email, password = user
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": username,
+            "email": email,
+            "password": password,
+            "confirm_password": password,
+        },
+    )
+    assert response.status_code == 201, response.text
+    verified = client.post(
+        "/api/v1/auth/verify-email",
+        json={"email": email, "code": sent_codes[email]},
+    )
+    assert verified.status_code == 200, verified.text
 
 
 def test_password_hash_and_verify():
@@ -64,6 +87,21 @@ def test_google_auth_rejects_invalid_credential(client, monkeypatch):
     assert response.status_code == 401
 
 
+def test_google_auth_rejects_unconfirmed_email_claim(client, monkeypatch):
+    monkeypatch.setattr(
+        auth_router.google_id_token,
+        "verify_oauth2_token",
+        lambda *_args, **_kwargs: {
+            "email": "not.verified@example.com",
+            "email_verified": "true",
+        },
+    )
+
+    response = client.post("/api/v1/auth/google/authenticate", json={"credential": "credential"})
+
+    assert response.status_code == 401
+
+
 def test_register_rejects_mismatched_password_confirmation(client):
     username, email, password = _random_user("mismatch")
 
@@ -80,7 +118,7 @@ def test_register_rejects_mismatched_password_confirmation(client):
     assert response.status_code == 422, response.text
 
 
-def test_register_login_and_create_owned_url(client):
+def test_register_requires_verification_before_login_and_create_owned_url(client, mock_verification_email):
     username, email, password = _random_user("alice")
 
     reg = client.post(
@@ -93,6 +131,20 @@ def test_register_login_and_create_owned_url(client):
         },
     )
     assert reg.status_code == 201, reg.text
+    assert "access_token" not in reg.json()
+
+    login = client.post(
+        "/api/v1/auth/login",
+        data={"username": username, "password": password},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 403, login.text
+
+    verified = client.post(
+        "/api/v1/auth/verify-email",
+        json={"email": email, "code": mock_verification_email[email]},
+    )
+    assert verified.status_code == 200, verified.text
 
     login = client.post(
         "/api/v1/auth/login",
@@ -122,6 +174,236 @@ def test_register_login_and_create_owned_url(client):
     assert stats.json()["short_code"] == body["short_code"]
 
 
+def test_register_retry_replaces_pending_otp_and_resets_verification(client, mock_verification_email, monkeypatch):
+    codes = iter(("111111", "222222"))
+    monkeypatch.setattr(auth_router, "create_verification_code", lambda: next(codes))
+    username, email, password = _random_user("register-retry")
+    first = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": email, "password": password, "confirm_password": password},
+    )
+    assert first.status_code == 201, first.text
+    first_code = mock_verification_email[email]
+
+    with Session(db_module.db.engine) as session:
+        pending = session.exec(select(EmailVerification)).first()
+        pending.attempts = 2
+        pending.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        session.add(pending)
+        session.commit()
+
+    retried = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": email, "password": password, "confirm_password": password},
+    )
+    assert retried.status_code == 201, retried.text
+    second_code = mock_verification_email[email]
+    assert second_code == "222222"
+    assert second_code != first_code
+
+    with Session(db_module.db.engine) as session:
+        pending = session.exec(select(EmailVerification)).first()
+        account = session.exec(select(User).where(User.username == username)).first()
+        assert pending.attempts == 0
+        assert pending.expires_at > datetime.now(timezone.utc).replace(tzinfo=None)
+        assert account.email_verified is False
+
+    old_code = client.post("/api/v1/auth/verify-email", json={"email": email, "code": first_code})
+    assert old_code.status_code == 400
+    new_code = client.post("/api/v1/auth/verify-email", json={"email": email, "code": second_code})
+    assert new_code.status_code == 200
+
+
+def test_verification_rejects_invalid_and_used_codes(client, mock_verification_email):
+    username, email, password = _random_user("otp-invalid")
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": email, "password": password, "confirm_password": password},
+    )
+    assert registered.status_code == 201, registered.text
+
+    invalid = client.post("/api/v1/auth/verify-email", json={"email": email, "code": "000000"})
+    assert invalid.status_code == 400
+
+    code = mock_verification_email[email]
+    verified = client.post("/api/v1/auth/verify-email", json={"email": email, "code": code})
+    assert verified.status_code == 200, verified.text
+    repeated = client.post("/api/v1/auth/verify-email", json={"email": email, "code": code})
+    assert repeated.status_code == 409
+
+
+def test_expired_code_is_rejected(client, mock_verification_email):
+    username, email, password = _random_user("otp-expired")
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": email, "password": password, "confirm_password": password},
+    )
+    assert response.status_code == 201, response.text
+
+    with Session(db_module.db.engine) as session:
+        verification = session.exec(select(EmailVerification)).first()
+        verification.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        session.add(verification)
+        session.commit()
+
+    expired = client.post(
+        "/api/v1/auth/verify-email",
+        json={"email": email, "code": mock_verification_email[email]},
+    )
+    assert expired.status_code == 410
+
+
+def test_incorrect_code_attempt_limit(client, mock_verification_email):
+    username, email, password = _random_user("otp-attempts")
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": email, "password": password, "confirm_password": password},
+    )
+    assert response.status_code == 201, response.text
+
+    statuses = [
+        client.post("/api/v1/auth/verify-email", json={"email": email, "code": "000000"}).status_code
+        for _ in range(auth_router.OTP_MAX_ATTEMPTS)
+    ]
+    assert statuses[:-1] == [400] * (auth_router.OTP_MAX_ATTEMPTS - 1)
+    assert statuses[-1] == 429
+    locked = client.post("/api/v1/auth/verify-email", json={"email": email, "code": mock_verification_email[email]})
+    assert locked.status_code == 429
+
+
+def test_resend_replaces_previous_code_and_enforces_cooldown(client, mock_verification_email, monkeypatch):
+    monkeypatch.setattr(auth_router, "create_verification_code", lambda: "123456")
+    username, email, password = _random_user("otp-resend")
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": email, "password": password, "confirm_password": password},
+    )
+    assert response.status_code == 201, response.text
+    old_code = mock_verification_email[email]
+
+    too_soon = client.post("/api/v1/auth/resend-verification", json={"email": email})
+    assert too_soon.status_code == 429
+
+    with Session(db_module.db.engine) as session:
+        verification = session.exec(select(EmailVerification)).first()
+        verification.last_sent_at = datetime.now(timezone.utc) - timedelta(seconds=61)
+        session.add(verification)
+        session.commit()
+
+    monkeypatch.setattr(auth_router, "create_verification_code", lambda: "654321")
+    resent = client.post("/api/v1/auth/resend-verification", json={"email": email})
+    assert resent.status_code == 200, resent.text
+    assert resent.json()["expires_in_seconds"] == auth_router.OTP_EXPIRY_MINUTES * 60
+
+    old_code_result = client.post("/api/v1/auth/verify-email", json={"email": email, "code": old_code})
+    assert old_code_result.status_code == 400
+    new_code_result = client.post("/api/v1/auth/verify-email", json={"email": email, "code": "654321"})
+    assert new_code_result.status_code == 200
+
+
+def test_change_pending_email_requires_password_and_replaces_otp(client, mock_verification_email, monkeypatch):
+    monkeypatch.setattr(auth_router, "create_verification_code", lambda: "123456")
+    username, email, password = _random_user("otp-change")
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": email, "password": password, "confirm_password": password},
+    )
+    assert registered.status_code == 201, registered.text
+
+    rejected = client.post(
+        "/api/v1/auth/change-pending-email",
+        json={"email": email, "new_email": "updated@example.com", "password": "WrongPass123!"},
+    )
+    assert rejected.status_code == 401
+    assert "updated@example.com" not in mock_verification_email
+
+    monkeypatch.setattr(auth_router, "create_verification_code", lambda: "654321")
+    changed = client.post(
+        "/api/v1/auth/change-pending-email",
+        json={"email": email, "new_email": "updated@example.com", "password": password},
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["email"] == "updated@example.com"
+    assert changed.json()["resend_after_seconds"] == auth_router.OTP_RESEND_COOLDOWN_SECONDS
+
+    original_code = client.post(
+        "/api/v1/auth/verify-email",
+        json={"email": "updated@example.com", "code": "123456"},
+    )
+    assert original_code.status_code == 400
+    replacement_code = client.post(
+        "/api/v1/auth/verify-email",
+        json={"email": "updated@example.com", "code": "654321"},
+    )
+    assert replacement_code.status_code == 200
+
+
+def test_change_pending_email_rejects_registered_destination(client, mock_verification_email):
+    pending = _random_user("otp-pending")
+    taken = _random_user("otp-taken")
+    for username, email, password in (pending, taken):
+        response = client.post(
+            "/api/v1/auth/register",
+            json={"username": username, "email": email, "password": password, "confirm_password": password},
+        )
+        assert response.status_code == 201, response.text
+
+    response = client.post(
+        "/api/v1/auth/change-pending-email",
+        json={"email": pending[1], "new_email": taken[1], "password": pending[2]},
+    )
+    assert response.status_code == 400
+
+
+def test_registration_delivery_failure_does_not_create_account(client, monkeypatch):
+    monkeypatch.setattr(auth_router, "send_verification_email", lambda *_args: (_ for _ in ()).throw(RuntimeError()))
+    username, email, password = _random_user("otp-delivery")
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": email, "password": password, "confirm_password": password},
+    )
+    assert response.status_code == 502
+    with Session(db_module.db.engine) as session:
+        assert session.exec(select(User).where(User.email == email)).first() is None
+
+
+def test_verification_email_uses_resend_settings(monkeypatch):
+    sent_payloads = []
+    monkeypatch.setattr(auth_router.resend.Emails, "send", lambda payload: sent_payloads.append(payload))
+
+    _send_verification_email("reader@example.com", "123456")
+
+    import hmac
+
+    assert hmac.compare_digest(
+        auth_router.resend.api_key or "",
+        settings.RESEND_API_KEY.get_secret_value(),
+    )
+    assert sent_payloads[0]["from"] == settings.EMAIL_FROM
+    assert sent_payloads[0]["to"] == ["reader@example.com"]
+    assert "123456" in sent_payloads[0]["text"]
+    assert "10 minutes" in sent_payloads[0]["text"]
+
+
+def test_register_rejects_duplicate_email_case_insensitively(client, mock_verification_email):
+    username, email, password = _random_user("otp-duplicate")
+    first = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": email, "password": password, "confirm_password": password},
+    )
+    assert first.status_code == 201
+    verified = client.post(
+        "/api/v1/auth/verify-email",
+        json={"email": email, "code": mock_verification_email[email]},
+    )
+    assert verified.status_code == 200
+    duplicate = client.post(
+        "/api/v1/auth/register",
+        json={"username": f"{username}_two", "email": email.upper(), "password": password, "confirm_password": password},
+    )
+    assert duplicate.status_code == 400
+
+
 def test_anonymous_create_allowed_but_owner_is_null(client):
     create = client.post(
         "/api/v1/shorten",
@@ -139,19 +421,10 @@ def test_anonymous_create_allowed_but_owner_is_null(client):
     assert row.owner_id is None
 
 
-def test_list_all_requires_auth(client):
+def test_list_all_requires_auth(client, mock_verification_email):
     username, email, password = _random_user("bob")
 
-    reg = client.post(
-        "/api/v1/auth/register",
-        json={
-            "username": username,
-            "email": email,
-            "password": password,
-            "confirm_password": password,
-        },
-    )
-    assert reg.status_code == 201, reg.text
+    _register_and_verify(client, (username, email, password), mock_verification_email)
 
     login = client.post(
         "/api/v1/auth/login",
@@ -181,31 +454,12 @@ def test_list_all_requires_auth(client):
     assert any(item["original_url"] == "https://example.org" for item in payload)
 
 
-def test_other_user_cannot_update_or_delete_owned_url(client):
+def test_other_user_cannot_update_or_delete_owned_url(client, mock_verification_email):
     alice_user = _random_user("alice")
     bob_user = _random_user("bob")
 
-    alice_reg = client.post(
-        "/api/v1/auth/register",
-        json={
-            "username": alice_user[0],
-            "email": alice_user[1],
-            "password": alice_user[2],
-            "confirm_password": alice_user[2],
-        },
-    )
-    assert alice_reg.status_code == 201, alice_reg.text
-
-    bob_reg = client.post(
-        "/api/v1/auth/register",
-        json={
-            "username": bob_user[0],
-            "email": bob_user[1],
-            "password": bob_user[2],
-            "confirm_password": bob_user[2],
-        },
-    )
-    assert bob_reg.status_code == 201, bob_reg.text
+    _register_and_verify(client, alice_user, mock_verification_email)
+    _register_and_verify(client, bob_user, mock_verification_email)
 
     alice_login = client.post(
         "/api/v1/auth/login",

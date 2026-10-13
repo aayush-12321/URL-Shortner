@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     backend_url: str = "http://localhost:8000"
     environment: str = "development"
 
+    # RESEND OTP setup
+    RESEND_API_KEY: SecretStr
+    EMAIL_FROM: str
+
     # Security
     secret_key: SecretStr = Field(..., min_length=32)
     algorithm: str = "HS256"

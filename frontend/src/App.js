@@ -54,7 +54,15 @@ function App() {
   const [expiredCode, setExpiredCode] = useState(null);
 
   // Modal States
-  const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login', loading: false, error: '' });
+  const [authModal, setAuthModal] = useState({
+    isOpen: false,
+    mode: 'login',
+    loading: false,
+    error: '',
+    verificationEmail: '',
+    resendAfterSeconds: 0,
+  });
+  const [pendingRegistration, setPendingRegistration] = useState(null);
   const [editModal, setEditModal] = useState({ isOpen: false, item: null, loading: false, error: '' });
   const [shortenLoading, setShortenLoading] = useState(false);
 
@@ -127,36 +135,63 @@ function App() {
   }, [token, fetchUser, fetchUrls]);
 
   const handleOpenAuth = (mode = 'login') => {
-    setAuthModal({ isOpen: true, mode, loading: false, error: '' });
+    setPendingRegistration(null);
+    setAuthModal((prev) => ({
+      ...prev,
+      isOpen: true,
+      mode,
+      loading: false,
+      error: '',
+      verificationEmail: '',
+      resendAfterSeconds: 0,
+    }));
   };
 
   const handleCloseAuth = () => {
-    setAuthModal((prev) => ({ ...prev, isOpen: false, error: '' }));
+    setPendingRegistration(null);
+    setAuthModal((prev) => ({
+      ...prev,
+      isOpen: false,
+      mode: 'login',
+      error: '',
+      verificationEmail: '',
+      resendAfterSeconds: 0,
+      loading: false,
+    }));
+  };
+
+  const clearPendingEmailVerification = () => {
+    setPendingRegistration(null);
+    setAuthModal((prev) => ({
+      ...prev,
+      mode: 'login',
+      verificationEmail: '',
+      resendAfterSeconds: 0,
+    }));
   };
 
   const handleAuthSubmit = async (mode, formData) => {
     setAuthModal((prev) => ({ ...prev, loading: true, error: '' }));
     try {
       if (mode === 'register') {
-        await API.post('/auth/register', {
+        const response = await API.post('/auth/register', {
           username: formData.username,
           email: formData.email,
           password: formData.password,
           confirm_password: formData.confirmPassword,
         });
-        addToast('Account created successfully! Logging you in...', 'success');
-        
-        // Auto-login after registration
-        const params = new URLSearchParams({
-          username: formData.username,
-          password: formData.password,
-        });
-        const loginRes = await API.post('/auth/login', params, {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        });
-        localStorage.setItem('token', loginRes.data.access_token);
-        setToken(loginRes.data.access_token);
-        handleCloseAuth();
+        const email = response.data.email || formData.email;
+        setPendingRegistration({ username: formData.username, password: formData.password });
+        setAuthModal((prev) => ({
+          ...prev,
+          mode: 'verify',
+          verificationEmail: email,
+          resendAfterSeconds: response.data.resend_after_seconds ?? 60,
+          loading: false,
+          error: '',
+        }));
+        addToast('Verification email sent. Check your inbox for the code.', 'success');
+        return email;
       } else {
         const params = new URLSearchParams({
           username: formData.username,
@@ -167,12 +202,114 @@ function App() {
         });
         localStorage.setItem('token', res.data.access_token);
         setToken(res.data.access_token);
+        clearPendingEmailVerification();
         addToast('Logged in successfully', 'success');
         handleCloseAuth();
+        return true;
       }
     } catch (err) {
       const errorMsg = getErrorMessage(err, 'Authentication failed. Please check your inputs.');
       setAuthModal((prev) => ({ ...prev, loading: false, error: errorMsg }));
+      return false;
+    }
+  };
+
+  const handleVerifyEmail = async (email, code) => {
+    setAuthModal((prev) => ({ ...prev, loading: true, error: '' }));
+    try {
+      await API.post('/auth/verify-email', { email, code });
+      const credentials = pendingRegistration;
+      setPendingRegistration(null);
+      if (credentials) {
+        try {
+          const params = new URLSearchParams(credentials);
+          const loginResponse = await API.post('/auth/login', params, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          });
+          localStorage.setItem('token', loginResponse.data.access_token);
+          setToken(loginResponse.data.access_token);
+          clearPendingEmailVerification();
+          handleCloseAuth();
+          addToast('Email verified and you are now signed in.', 'success');
+          return true;
+        } catch (loginError) {
+          setAuthModal((prev) => ({
+            ...prev,
+            mode: 'login',
+            verificationEmail: '',
+            loading: false,
+            error: `Email verified, but automatic sign-in failed: ${getErrorMessage(loginError, 'Please log in.')}`,
+          }));
+          return true;
+        }
+      }
+      setAuthModal((prev) => ({
+        ...prev,
+        mode: 'login',
+        verificationEmail: '',
+        resendAfterSeconds: 0,
+        loading: false,
+        error: '',
+      }));
+      addToast('Email verified. You can now log in.', 'success');
+      return true;
+    } catch (err) {
+      setAuthModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: getErrorMessage(err, 'Could not verify your email. Please try again.'),
+      }));
+      return false;
+    }
+  };
+
+  const handleResendVerification = async (email) => {
+    setAuthModal((prev) => ({ ...prev, loading: true, error: '' }));
+    try {
+      const response = await API.post('/auth/resend-verification', { email });
+      setAuthModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: '',
+        resendAfterSeconds: response.data.resend_after_seconds ?? 60,
+      }));
+      addToast('A new verification code has been sent.', 'success');
+      return response.data.resend_after_seconds ?? 60;
+    } catch (err) {
+      setAuthModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: getErrorMessage(err, 'Could not resend the verification code.'),
+      }));
+      return false;
+    }
+  };
+
+  const handleChangePendingEmail = async (email, newEmail, password) => {
+    setAuthModal((prev) => ({ ...prev, loading: true, error: '' }));
+    try {
+      const response = await API.post('/auth/change-pending-email', {
+        email,
+        new_email: newEmail,
+        password,
+      });
+      setAuthModal((prev) => ({
+        ...prev,
+        mode: 'verify',
+        verificationEmail: response.data.email,
+        resendAfterSeconds: response.data.resend_after_seconds ?? 60,
+        loading: false,
+        error: '',
+      }));
+      addToast('Email updated. A new verification code was sent.', 'success');
+      return response.data.resend_after_seconds ?? 60;
+    } catch (err) {
+      setAuthModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: getErrorMessage(err, 'Could not update the email address.'),
+      }));
+      return false;
     }
   };
 
@@ -182,6 +319,7 @@ function App() {
       const response = await API.post('/auth/google/authenticate', { credential });
       localStorage.setItem('token', response.data.access_token);
       setToken(response.data.access_token);
+      clearPendingEmailVerification();
       handleCloseAuth();
       addToast('Signed in with Google', 'success');
     } catch (err) {
@@ -204,6 +342,7 @@ function App() {
       setUser(null);
       setUrls([]);
       setLatestResult(null);
+      clearPendingEmailVerification();
       addToast('Logged out', 'info');
     }
   };
@@ -361,8 +500,13 @@ function App() {
       <AuthModal
         isOpen={authModal.isOpen}
         initialMode={authModal.mode}
+        verificationEmail={authModal.verificationEmail}
+        resendAfterSeconds={authModal.resendAfterSeconds}
         onClose={handleCloseAuth}
         onSubmit={handleAuthSubmit}
+        onVerifyEmail={handleVerifyEmail}
+        onResendVerification={handleResendVerification}
+        onChangePendingEmail={handleChangePendingEmail}
         onGoogleCredential={handleGoogleCredential}
         loading={authModal.loading}
         error={authModal.error}
