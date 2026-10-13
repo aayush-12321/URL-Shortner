@@ -47,7 +47,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # Include routes
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(urls_router)

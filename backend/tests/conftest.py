@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import SQLModel, create_engine
 
+import app.auth.router as auth_router
 from app.database import db as db_module
 from app.main import app
 
@@ -36,3 +37,16 @@ def test_db_engine() -> Generator:
 def client(test_db_engine) -> Generator[TestClient, None, None]:
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def mock_verification_email(monkeypatch) -> dict[str, str]:
+    auth_router.RATE_LIMIT_STORE.clear()
+    auth_router.LOGIN_LOCKOUT_STORE.clear()
+    sent_codes: dict[str, str] = {}
+    monkeypatch.setattr(
+        auth_router,
+        "send_verification_email",
+        lambda email, code: sent_codes.__setitem__(email, code),
+    )
+    return sent_codes

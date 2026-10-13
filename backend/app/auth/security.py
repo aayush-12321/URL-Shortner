@@ -32,7 +32,7 @@ def create_access_token(subject: str | Any, expires_delta: timedelta | None = No
         expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
 
     to_encode = {"sub": str(subject), "exp": datetime.now(timezone.utc) + expires_delta}
-    return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+    return jwt.encode(to_encode, settings.secret_key.get_secret_value(), algorithm=settings.algorithm)
 
 
 def create_refresh_token(subject: str | Any, expires_delta: timedelta | None = None) -> str:
@@ -43,7 +43,7 @@ def create_refresh_token(subject: str | Any, expires_delta: timedelta | None = N
     # include a unique token id (jti) for rotation/revocation
     jti = str(uuid4())
     to_encode = {"sub": str(subject), "type": "refresh", "jti": jti, "exp": datetime.now(timezone.utc) + expires_delta}
-    token = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+    token = jwt.encode(to_encode, settings.secret_key.get_secret_value(), algorithm=settings.algorithm)
     return token
 
 
@@ -80,7 +80,7 @@ def validate_refresh_token_record(session: Session, jti: str) -> bool:
 def decode_token(token: str) -> dict[str, Any]:
     """Decode and validate a JWT token."""
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        payload = jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[settings.algorithm])
         return payload
     except JWTError as exc:
         raise HTTPException(
