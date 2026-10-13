@@ -1,5 +1,6 @@
 import uuid
 
+import app.auth.router as auth_router
 from sqlmodel import Session, select
 
 from app import database as db_module
@@ -22,6 +23,45 @@ def test_password_hash_and_verify():
     assert hashed != password
     assert verify_password(password, hashed) is True
     assert verify_password("wrong-pass", hashed) is False
+
+
+def test_google_auth_creates_user_with_google_profile_name(client, monkeypatch):
+    monkeypatch.setattr(
+        auth_router.google_id_token,
+        "verify_oauth2_token",
+        lambda *_args, **_kwargs: {
+            "email": "google.user@example.com",
+            "email_verified": True,
+            "name": "Google Profile Name",
+            "picture": "https://example.com/google-user.jpg",
+        },
+    )
+
+    response = client.post("/api/v1/auth/google/authenticate", json={"credential": "verified-google-credential"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["access_token"]
+    assert response.cookies.get("refresh_token")
+
+    profile = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {response.json()['access_token']}"},
+    )
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["username"] == "Google Profile Name"
+    assert profile.json()["email"] == "google.user@example.com"
+    assert profile.json()["image_url"] == "https://example.com/google-user.jpg"
+
+
+def test_google_auth_rejects_invalid_credential(client, monkeypatch):
+    def reject_credential(*_args, **_kwargs):
+        raise ValueError("Invalid token")
+
+    monkeypatch.setattr(auth_router.google_id_token, "verify_oauth2_token", reject_credential)
+
+    response = client.post("/api/v1/auth/google/authenticate", json={"credential": "invalid"})
+
+    assert response.status_code == 401
 
 
 def test_register_rejects_mismatched_password_confirmation(client):

@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, status, Request, Response
 from datetime import datetime, timezone
 from fastapi.security import OAuth2PasswordRequestForm
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from sqlmodel import Session, select
 import time
+from uuid import uuid4
 
 from app.database.db import get_session
 from app.models.models import Token, User, UserCreate, UserRead
@@ -81,6 +84,68 @@ def clear_login_lockout(request: Request, username: str):
     LOGIN_LOCKOUT_STORE.pop(key, None)
 
 router = APIRouter()
+
+@router.get("/google/client-id")
+def get_google_client_id():
+    return {"client_id": settings.google_client_id}
+
+
+@router.post("/google/authenticate", response_model=Token)
+def google_authenticate(
+    response: Response,
+    credential: str = Body(embed=True),
+    session: Session = Depends(get_session),
+):
+    try:
+        user_info = google_id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            settings.google_client_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google credential") from exc
+
+    email = user_info.get("email", "").lower()
+    image_url = user_info.get("picture")
+    if not email or not user_info.get("email_verified"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google account email is not verified")
+
+    user = session.exec(select(User).where(User.email == email)).first()
+    if not user:
+        username = str(user_info.get("name") or user_info.get("given_name") or email.split("@", 1)[0]).strip()[:50]
+        if session.exec(select(User).where(User.username == username)).first():
+            username = f"{username[:38]}_{uuid4().hex[:10]}"
+        user = User(
+            username=username,
+            email=email,
+            hashed_password=get_password_hash(uuid4().hex),
+            image_url=image_url,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+    elif image_url and user.image_url != image_url:
+        user.image_url = image_url
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
+    payload = decode_token(refresh_token)
+    expires_at = datetime.fromtimestamp(int(payload["exp"]), timezone.utc)
+    create_refresh_token_record(session, payload["jti"], user.id, expires_at=expires_at)
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        max_age=60 * 60 * 24 * settings.refresh_token_expire_days,
+        path="/api/v1/auth/refresh",
+    )
+    return Token(access_token=access_token, token_type="bearer")
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -239,6 +304,7 @@ def read_current_user(current_user: User = Depends(get_current_user)):
         id=current_user.id,
         username=current_user.username,
         email=current_user.email,
+        image_url=current_user.image_url,
         created_at=current_user.created_at,
     )
 

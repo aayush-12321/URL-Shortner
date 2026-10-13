@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 
-function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, loading, error }) {
+function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, onGoogleCredential, loading, error }) {
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({
     username: '',
@@ -11,6 +12,12 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, loading, 
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [formError, setFormError] = useState('');
+  const [googleError, setGoogleError] = useState('');
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const googleButtonRef = useRef(null);
+  const googleCredentialHandler = useRef(onGoogleCredential);
+
+  googleCredentialHandler.current = onGoogleCredential;
 
   useEffect(() => {
     setMode(initialMode);
@@ -29,6 +36,65 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, loading, 
     return () => {
       document.body.style.overflow = previousOverflow;
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    let cancelled = false;
+    setGoogleError('');
+    setGoogleLoading(true);
+
+    const loadGoogleButton = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/google/client-id`);
+        if (!response.ok) throw new Error('Could not load Google sign-in.');
+        const { client_id: clientId } = await response.json();
+
+        if (!window.google?.accounts?.id) {
+          let script = document.getElementById('google-identity-services');
+          if (!script) {
+            script = document.createElement('script');
+            script.id = 'google-identity-services';
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+          }
+          await new Promise((resolve, reject) => {
+            if (window.google?.accounts?.id) return resolve();
+            script.addEventListener('load', resolve, { once: true });
+            script.addEventListener('error', reject, { once: true });
+          });
+        }
+
+        if (cancelled || !googleButtonRef.current) return;
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: ({ credential }) => {
+            if (credential) googleCredentialHandler.current(credential);
+          },
+        });
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'rectangular',
+          logo_alignment: 'center',
+          width: Math.min(400, Math.max(240, Math.floor(googleButtonRef.current.clientWidth))),
+        });
+        setGoogleLoading(false);
+      } catch (loadError) {
+        if (!cancelled) {
+          setGoogleError(loadError.message || 'Google sign-in could not be loaded.');
+          setGoogleLoading(false);
+        }
+      }
+    };
+
+    loadGoogleButton();
+    return () => { cancelled = true; };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -77,6 +143,12 @@ function AuthModal({ isOpen, initialMode = 'login', onClose, onSubmit, loading, 
             >
               Sign Up
             </button>
+          </div>
+
+          <div style={{ margin: '0.25rem 0 1.25rem', textAlign: 'center' }}>
+            <div ref={googleButtonRef} style={{ display: 'flex', justifyContent: 'center', minHeight: '40px' }} />
+            {googleLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Loading Google sign-in…</span>}
+            {googleError && <div role="alert" style={{ color: '#F43F5E', fontSize: '0.8rem', marginTop: '0.5rem' }}>{googleError}</div>}
           </div>
 
           {(formError || error) && (

@@ -11,6 +11,7 @@ class User(SQLModel, table=True):
     username: str = Field(unique=True, index=True, min_length=3, max_length=50)
     email: EmailStr = Field(unique=True, index=True)
     hashed_password: str
+    image_url: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -39,6 +40,7 @@ class UserRead(SQLModel):
     id: int
     username: str
     email: EmailStr
+    image_url: str | None = None
     created_at: datetime
 
 

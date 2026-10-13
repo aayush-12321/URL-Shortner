@@ -53,7 +53,17 @@ function Navbar({ user, currentPage, onNavigate, onOpenAuth, onLogout }) {
           {user ? (
             <>
               <div className="user-badge">
-                <div className="user-avatar">{user.username.charAt(0).toUpperCase()}</div>
+                <div className="user-avatar">
+                  {user.username.charAt(0).toUpperCase()}
+                  {user.image_url && (
+                    <img
+                      src={user.image_url}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
+                </div>
                 <span>{user.username}</span>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={onLogout}>

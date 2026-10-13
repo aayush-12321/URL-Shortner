@@ -176,6 +176,23 @@ function App() {
     }
   };
 
+  const handleGoogleCredential = async (credential) => {
+    setAuthModal((prev) => ({ ...prev, loading: true, error: '' }));
+    try {
+      const response = await API.post('/auth/google/authenticate', { credential });
+      localStorage.setItem('token', response.data.access_token);
+      setToken(response.data.access_token);
+      handleCloseAuth();
+      addToast('Signed in with Google', 'success');
+    } catch (err) {
+      setAuthModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: getErrorMessage(err, 'Google sign-in failed. Please try again.'),
+      }));
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await API.post('/auth/logout', null, { headers: authHeaders });
@@ -346,6 +363,7 @@ function App() {
         initialMode={authModal.mode}
         onClose={handleCloseAuth}
         onSubmit={handleAuthSubmit}
+        onGoogleCredential={handleGoogleCredential}
         loading={authModal.loading}
         error={authModal.error}
       />

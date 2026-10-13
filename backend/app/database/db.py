@@ -1,4 +1,5 @@
 from sqlmodel import create_engine, SQLModel, Session
+from sqlalchemy import inspect, text
 from typing import Generator
 from app.config import settings
 
@@ -29,6 +30,10 @@ engine = get_engine()
 def create_db_and_tables():
     """Create database tables on startup"""
     SQLModel.metadata.create_all(engine)
+    user_columns = {column["name"] for column in inspect(engine).get_columns("user")}
+    if "image_url" not in user_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE user ADD COLUMN image_url VARCHAR"))
 
 
 def get_session() -> Generator[Session, None, None]:
