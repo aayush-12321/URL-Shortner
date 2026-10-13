@@ -67,7 +67,7 @@ function EditUrlModal({ isOpen, item, onClose, onSave, loading, error }) {
             <div style={{ fontFamily: 'JetBrains Mono', fontWeight: '700', color: 'var(--accent-emerald)' }}>
               {item.short_code}
             </div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.35rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.35rem', minWidth: 0, overflowWrap: 'anywhere' }}>
               {item.original_url}
             </div>
           </div>

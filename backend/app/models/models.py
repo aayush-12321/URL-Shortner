@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime, timezone
 
-from pydantic import EmailStr
+from pydantic import EmailStr, model_validator
 from sqlmodel import Field, SQLModel
 
 
@@ -19,6 +19,13 @@ class UserCreate(SQLModel):
     username: str = Field(min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
+    confirm_password: str
+
+    @model_validator(mode="after")
+    def passwords_match(self):
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match.")
+        return self
 
 
 class UserLogin(SQLModel):

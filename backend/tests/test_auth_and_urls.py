@@ -24,12 +24,33 @@ def test_password_hash_and_verify():
     assert verify_password("wrong-pass", hashed) is False
 
 
+def test_register_rejects_mismatched_password_confirmation(client):
+    username, email, password = _random_user("mismatch")
+
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": username,
+            "email": email,
+            "password": password,
+            "confirm_password": "DifferentPass123!",
+        },
+    )
+
+    assert response.status_code == 422, response.text
+
+
 def test_register_login_and_create_owned_url(client):
     username, email, password = _random_user("alice")
 
     reg = client.post(
         "/api/v1/auth/register",
-        json={"username": username, "email": email, "password": password},
+        json={
+            "username": username,
+            "email": email,
+            "password": password,
+            "confirm_password": password,
+        },
     )
     assert reg.status_code == 201, reg.text
 
@@ -83,7 +104,12 @@ def test_list_all_requires_auth(client):
 
     reg = client.post(
         "/api/v1/auth/register",
-        json={"username": username, "email": email, "password": password},
+        json={
+            "username": username,
+            "email": email,
+            "password": password,
+            "confirm_password": password,
+        },
     )
     assert reg.status_code == 201, reg.text
 
@@ -121,13 +147,23 @@ def test_other_user_cannot_update_or_delete_owned_url(client):
 
     alice_reg = client.post(
         "/api/v1/auth/register",
-        json={"username": alice_user[0], "email": alice_user[1], "password": alice_user[2]},
+        json={
+            "username": alice_user[0],
+            "email": alice_user[1],
+            "password": alice_user[2],
+            "confirm_password": alice_user[2],
+        },
     )
     assert alice_reg.status_code == 201, alice_reg.text
 
     bob_reg = client.post(
         "/api/v1/auth/register",
-        json={"username": bob_user[0], "email": bob_user[1], "password": bob_user[2]},
+        json={
+            "username": bob_user[0],
+            "email": bob_user[1],
+            "password": bob_user[2],
+            "confirm_password": bob_user[2],
+        },
     )
     assert bob_reg.status_code == 201, bob_reg.text
 

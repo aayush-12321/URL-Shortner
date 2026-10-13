@@ -4,7 +4,8 @@
 [![React](https://img.shields.io/badge/Frontend-React_18-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python)](https://www.python.org/)
 [![Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://url-shortener.parajuliaayush.com.np/)
-[![Railway](https://img.shields.io/badge/Backend-Railway-0B0D0E?style=flat-square&logo=railway&logoColor=white)](https://go.parajuliaayush.com.np/)
+[![Backend](https://img.shields.io/badge/Backend-API-0B0D0E?style=flat-square&logo=fastapi&logoColor=white)](https://go.parajuliaayush.com.np/)
+[![Render](https://img.shields.io/badge/Deployed_on-Render-46E3B7?style=flat-square&logo=render&logoColor=white)](YOUR_RENDER_BACKEND_URL)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
 [![uv](https://img.shields.io/badge/Package_Manager-uv-DE5B8B?style=flat-square)](https://github.com/astral-sh/uv)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
@@ -14,7 +15,7 @@ A high-performance, full-stack URL shortening service with real-time click track
 ## 🌐 Live Deployment
 
 - **Web app**: [url-shortener.parajuliaayush.com.np](https://url-shortener.parajuliaayush.com.np/)
-- **API server**: [go.parajuliaayush.com.np](https://go.parajuliaayush.com.np/)
+- **Backend API**: [Render deployment](https://go.parajuliaayush.com.np/)
 - **API base path**: `https://go.parajuliaayush.com.np/api/v1`
 
 Including the backend URL in the README is recommended. It helps users understand the deployment architecture, test the API, and configure the frontend when the backend is hosted on a different origin.
@@ -25,7 +26,7 @@ Including the backend URL in the README is recommended. It helps users understan
 
 - ⚡ **Instant URL Shortening**: Convert long, messy links into clean short URLs in milliseconds.
 - 🐳 **Dockerized Deployment**: Package and run the FastAPI application consistently with Docker.
-- 🚀 **Automated GitHub → Railway Deployment**: Deploy changes automatically from GitHub to Railway.
+- 🚀 **Container-Ready Deployment**: The app is designed to run in Docker and is currently deployed on Render for the backend while the frontend is served on Vercel.
 - 🔒 **User Authentication**: Secure JWT-based registration and login via sleek popup modals.
 - 📋 **Link Dashboard**: View all your shortened URLs with real-time click counters and creation timestamps.
 - ✏️ **Full Link Management**:
@@ -44,22 +45,21 @@ Including the backend URL in the README is recommended. It helps users understan
 - Python 3.12+
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [SQLModel](https://sqlmodel.tiangolo.com/)
-- SQLite
+- SQLite by default, with `DATABASE_URL` override support
 - JWT authentication
 - Docker
 - [uv](https://github.com/astral-sh/uv)
-- [Railway](https://railway.com/)
 - React 18 with Axios and vanilla CSS for the frontend
 
 ## 🧩 Architecture
 
-The project is split into a React frontend and a FastAPI backend. The frontend communicates with the backend over the `/api/v1` REST API. FastAPI handles authentication, URL management, redirects, and analytics; SQLModel persists application data in SQLite. The Docker image runs the backend with `uvicorn`, while `/app/data` is mounted to persistent storage in production.
+The project is split into a React frontend and a FastAPI backend. The frontend communicates with the backend over the `/api/v1` REST API. FastAPI handles authentication, URL management, redirects, and analytics; SQLModel persists application data in SQLite by default, and the `DATABASE_URL` setting can be changed to use a different database provider if needed. The Docker image runs the backend with `uvicorn`, while `/app/data` is mounted to persistent storage in production.
 
 ```text
 React frontend
    │ REST API (/api/v1)
    ▼
-FastAPI backend ── SQLModel ── SQLite (/app/data)
+FastAPI backend ── SQLModel ── SQLite by default (/app/data)
    │
    └── JWT authentication and URL analytics
 ```
@@ -112,8 +112,18 @@ URL Shortener/
    ```bash
    cp .env.example .env
    ```
+   By default the app uses SQLite, with the database stored under the backend data folder. You can also point it at PostgreSQL/Neon by setting `DATABASE_URL` in `.env` before starting the app.
 
-3. Start the FastAPI development server:
+3. Run the test suite from the project root:
+   ```bash
+   uv run pytest -q
+   ```
+   If you are already in the project virtual environment, this also works:
+   ```bash
+   .venv/bin/python -m pytest -q
+   ```
+
+4. Start the FastAPI development server:
    ```bash
    uv run uvicorn backend.app.main:app --reload --port 8000
    ```
@@ -169,6 +179,7 @@ as well.
 | `POST` | `/api/v1/auth/login` | No | Authenticate user and receive JWT access token |
 | `POST` | `/api/v1/auth/logout` | Yes | Invalidate user session |
 | `GET` | `/api/v1/auth/me` | Yes | Fetch currently authenticated user profile |
+| `GET` | `/health` | No | Check backend health and database status |
 | `GET` | `/api/v1/list/all` | Yes | List all shortened URLs owned by current user |
 | `GET` | `/api/v1/stats/{short_code}` | Yes | Get click analytics and metadata for a short link |
 | `PATCH` | `/api/v1/stats/{short_code}` | Yes | Update link metadata (description / expiration) |
@@ -196,7 +207,7 @@ Run the application using your `.env` file and the persistent volume:
 docker run --env-file .env -p 8000:8000 -v url-shortener-data:/app/data url-shortener
 ```
 
-The SQLite database is stored in `data/` and persists in the `url-shortener-data` Docker volume.
+The default SQLite database is stored in `backend/data/` and persists in the `url-shortener-data` Docker volume. If you override `DATABASE_URL`, the app will use that configured database instead.
 ---
 
 ## 📝 License

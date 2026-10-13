@@ -92,7 +92,9 @@ print(response.json())`;
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: '0.85rem',
             color: 'var(--accent-emerald)',
-            whiteSpace: 'pre'
+            whiteSpace: 'pre',
+            maxWidth: '100%',
+            overflowX: 'auto'
           }}>
 {`{
   "short_code": "my-custom-link",
