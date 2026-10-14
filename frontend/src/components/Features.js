@@ -3,6 +3,16 @@ import React from 'react';
 function Features({ onNavigate, onOpenAuth }) {
   const features = [
     {
+      title: 'Flexible Authentication',
+      description: 'Sign in with Google or use email and password. New email accounts are verified with a one-time passcode (OTP).',
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+      )
+    },
+    {
       title: 'Custom Link Slugs',
       description: 'Replace random character strings with memorable, branded custom aliases like shortlink/my-brand for better brand recognition.',
       icon: (

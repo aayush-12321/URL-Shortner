@@ -28,7 +28,7 @@ Including the backend URL in the README is recommended. It helps users understan
 - ⚡ **Instant URL Shortening**: Convert long, messy links into clean short URLs in milliseconds.
 - 🐳 **Dockerized Deployment**: Package and run the FastAPI application consistently with Docker.
 - 🚀 **Container-Ready Deployment**: The app is designed to run in Docker and is currently deployed on Render for the backend while the frontend is served on Vercel.
-- 🔒 **User Authentication**: Register with email and verify it using an OTP, or sign in with Google. Authenticated users receive secure JWT-based access.
+- 🔒 **User Authentication**: Register with email and verify it using an OTP, reset or recover access via forgot-password/reset-password flows, delete your account when needed, or sign in with Google. Authenticated users receive secure JWT-based access.
 - 📋 **Link Dashboard**: View all your shortened URLs with real-time click counters and creation timestamps.
 - ✏️ **Full Link Management**:
   - One-click **Copy to Clipboard** with instant visual confirmation.
@@ -172,7 +172,7 @@ as well.
 
 ## 🔐 Authentication
 
-The app supports Google sign-in and email registration with OTP verification.
+The app supports Google sign-in and email registration with OTP verification. Forgot-password, reset-password, and delete-account options are also available.
 
 ### Google Sign-In
 
