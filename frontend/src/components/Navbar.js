@@ -1,6 +1,6 @@
 import React from 'react';
 
-function Navbar({ user, currentPage, onNavigate, onOpenAuth, onLogout }) {
+function Navbar({ user, currentPage, onNavigate, onOpenAuth }) {
   return (
     <header className="navbar">
       <div className="nav-container">
@@ -51,8 +51,12 @@ function Navbar({ user, currentPage, onNavigate, onOpenAuth, onLogout }) {
 
         <div className="nav-actions">
           {user ? (
-            <>
-              <div className="user-badge">
+            <button
+              className={`user-badge ${currentPage === 'profile' ? 'active' : ''}`}
+              onClick={() => onNavigate('profile')}
+              aria-label="View profile"
+              aria-current={currentPage === 'profile' ? 'page' : undefined}
+            >
                 <div className="user-avatar">
                   {user.username.charAt(0).toUpperCase()}
                   {user.image_url && (
@@ -64,17 +68,7 @@ function Navbar({ user, currentPage, onNavigate, onOpenAuth, onLogout }) {
                     />
                   )}
                 </div>
-                <span>{user.username}</span>
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={onLogout}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                Logout
-              </button>
-            </>
+            </button>
           ) : (
             <>
               <button className="btn btn-ghost btn-sm" onClick={() => onOpenAuth('login')}>

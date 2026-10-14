@@ -13,6 +13,7 @@ import Terms from './components/Terms';
 import Features from './components/Features';
 import ApiDocs from './components/ApiDocs';
 import ExpiredUrlModal from './components/ExpiredUrlModal';
+import ProfilePage from './components/ProfilePage';
 import { API_BASE_URL } from './config';
 
 
@@ -40,7 +41,7 @@ const getErrorMessage = (err, fallback = 'An unexpected error occurred.') => {
 
 const getPageFromHash = () => {
   const hash = window.location.hash.replace('#', '').trim();
-  const validPages = ['home', 'features', 'how-it-works', 'api-docs', 'terms'];
+  const validPages = ['home', 'features', 'how-it-works', 'api-docs', 'terms', 'profile'];
   return validPages.includes(hash) ? hash : 'home';
 };
 
@@ -50,7 +51,7 @@ function App() {
   const [urls, setUrls] = useState([]);
   const [latestResult, setLatestResult] = useState(null);
   const [toasts, setToasts] = useState([]);
-  const [currentPage, setCurrentPage] = useState(getPageFromHash); // 'home' | 'features' | 'how-it-works' | 'api-docs' | 'terms'
+  const [currentPage, setCurrentPage] = useState(getPageFromHash);
   const [expiredCode, setExpiredCode] = useState(null);
 
   // Modal States
@@ -73,6 +74,13 @@ function App() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (currentPage === 'profile' && !token) {
+      setCurrentPage('home');
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, [currentPage, token]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -173,6 +181,23 @@ function App() {
   const handleAuthSubmit = async (mode, formData) => {
     setAuthModal((prev) => ({ ...prev, loading: true, error: '' }));
     try {
+      if (mode === 'forgot-request') {
+        await API.post('/auth/forgot-password', { email: formData.email });
+        setAuthModal((prev) => ({ ...prev, loading: false, error: '' }));
+        addToast('If this email belongs to a password account, a reset code has been sent.', 'info');
+        return true;
+      }
+      if (mode === 'forgot-reset') {
+        await API.post('/auth/reset-password', {
+          email: formData.email,
+          code: formData.verificationCode,
+          new_password: formData.password,
+          confirm_password: formData.confirmPassword,
+        });
+        addToast('Password reset. You can now sign in.', 'success');
+        handleCloseAuth();
+        return true;
+      }
       if (mode === 'register') {
         const response = await API.post('/auth/register', {
           username: formData.username,
@@ -347,6 +372,50 @@ function App() {
     }
   };
 
+  const handleDeleteAccount = async (confirmation) => {
+    try {
+      await API.delete('/auth/me', { data: { confirmation }, headers: authHeaders });
+      localStorage.removeItem('token');
+      setToken('');
+      setUser(null);
+      setUrls([]);
+      setLatestResult(null);
+      clearPendingEmailVerification();
+      addToast('Your account and its links have been deleted.', 'success');
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err, 'Could not delete your account.') };
+    }
+  };
+
+  const handleChangePassword = async (payload) => {
+    try {
+      await API.post('/auth/change-password', payload, { headers: authHeaders });
+      addToast('Password updated successfully.', 'success');
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err, 'Could not update your password.') };
+    }
+  };
+
+  const handleRequestPasswordReset = async (email) => {
+    try {
+      const response = await API.post('/auth/forgot-password', { email });
+      return { success: true, message: response.data.message };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err, 'Could not request a reset code.') };
+    }
+  };
+
+  const handleResetPassword = async (payload) => {
+    try {
+      const response = await API.post('/auth/reset-password', payload);
+      return { success: true, message: response.data.message };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err, 'Could not reset your password.') };
+    }
+  };
+
   const handleShorten = async (data) => {
     setShortenLoading(true);
     try {
@@ -411,6 +480,10 @@ function App() {
   };
 
   const handleNavigate = (page) => {
+    if (page === 'profile' && !user) {
+      handleOpenAuth('login');
+      return;
+    }
     setCurrentPage(page);
     if (page === 'home') {
       if (window.location.hash) {
@@ -429,7 +502,6 @@ function App() {
         currentPage={currentPage}
         onNavigate={handleNavigate}
         onOpenAuth={handleOpenAuth}
-        onLogout={handleLogout}
       />
 
       <main className="main-content">
@@ -492,6 +564,17 @@ function App() {
 
         {currentPage === 'terms' && (
           <Terms onNavigate={handleNavigate} />
+        )}
+
+        {currentPage === 'profile' && user && (
+          <ProfilePage
+            user={user}
+            onLogout={handleLogout}
+            onChangePassword={handleChangePassword}
+            onRequestPasswordReset={handleRequestPasswordReset}
+            onResetPassword={handleResetPassword}
+            onDeleteAccount={handleDeleteAccount}
+          />
         )}
       </main>
 
