@@ -21,13 +21,16 @@ function PasswordField({ id, label, value, onChange, autoComplete = 'new-passwor
   );
 }
 
-function ProfilePage({ user, onLogout, onChangePassword, onRequestPasswordReset, onResetPassword }) {
+function ProfilePage({ user, onLogout, onChangePassword, onRequestPasswordReset, onResetPassword, onDeleteAccount }) {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [resetForm, setResetForm] = useState({ code: '', newPassword: '', confirmPassword: '' });
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [resetStarted, setResetStarted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [passwordNotice, setPasswordNotice] = useState(null);
   const [resetNotice, setResetNotice] = useState(null);
+  const [deleteNotice, setDeleteNotice] = useState(null);
 
   const isGoogleAccount = user.auth_provider === 'google';
   const joinedDate = new Date(user.created_at).toLocaleDateString(undefined, {
@@ -91,6 +94,28 @@ function ProfilePage({ user, onLogout, onChangePassword, onRequestPasswordReset,
     } else {
       setResetNotice({ type: 'error', text: result.error });
     }
+  };
+
+  const submitAccountDeletion = async (event) => {
+    event.preventDefault();
+    setDeleteNotice(null);
+    if (deleteConfirmation !== 'DELETE') {
+      setDeleteNotice({ type: 'error', text: 'Type DELETE exactly to confirm account deletion.' });
+      return;
+    }
+    setBusy(true);
+    const result = await onDeleteAccount(deleteConfirmation);
+    setBusy(false);
+    if (!result.success) {
+      setDeleteNotice({ type: 'error', text: result.error });
+    }
+  };
+
+  const closeDeleteModal = () => {
+    if (busy) return;
+    setDeleteModalOpen(false);
+    setDeleteConfirmation('');
+    setDeleteNotice(null);
   };
 
   return (
@@ -194,6 +219,56 @@ function ProfilePage({ user, onLogout, onChangePassword, onRequestPasswordReset,
         </div>
         <button type="button" className="btn btn-danger" onClick={onLogout}>Log out</button>
       </div>
+
+      <section className="profile-delete-row" aria-labelledby="delete-account-title">
+        <div>
+          <strong id="delete-account-title">Delete account</strong>
+          <p>Permanently delete your account, saved links, and related data. This cannot be undone.</p>
+          <button type="button" className="btn btn-danger profile-delete-trigger" onClick={() => setDeleteModalOpen(true)}>
+            Delete account
+          </button>
+        </div>
+      </section>
+
+      {deleteModalOpen && (
+        <div className="modal-overlay" onClick={closeDeleteModal}>
+          <div className="modal-container" role="dialog" aria-modal="true" aria-labelledby="delete-account-modal-title" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2 id="delete-account-modal-title" className="modal-title">Confirm account deletion</h2>
+              <button type="button" className="modal-close" onClick={closeDeleteModal} disabled={busy} aria-label="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="profile-card-description">Permanently delete your account, saved links, and related data. This cannot be undone.</p>
+              <form className="profile-delete-modal-form" onSubmit={submitAccountDeletion}>
+                {deleteNotice && <div className={`profile-notice profile-notice-${deleteNotice.type}`} role="alert">{deleteNotice.text}</div>}
+                <div className="form-group">
+                  <label htmlFor="delete-account-confirmation">Type DELETE to confirm</label>
+                  <input
+                    id="delete-account-confirmation"
+                    type="text"
+                    className="form-input form-input-simple"
+                    value={deleteConfirmation}
+                    onChange={(event) => setDeleteConfirmation(event.target.value)}
+                    autoComplete="off"
+                    required
+                  />
+                </div>
+                <div className="profile-delete-actions">
+                  <button type="button" className="btn btn-ghost" onClick={closeDeleteModal} disabled={busy}>Cancel</button>
+                  <button type="submit" className="btn btn-danger" disabled={busy || deleteConfirmation !== 'DELETE'}>
+                    {busy ? 'Deleting…' : 'Delete account'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

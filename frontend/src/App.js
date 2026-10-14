@@ -372,6 +372,22 @@ function App() {
     }
   };
 
+  const handleDeleteAccount = async (confirmation) => {
+    try {
+      await API.delete('/auth/me', { data: { confirmation }, headers: authHeaders });
+      localStorage.removeItem('token');
+      setToken('');
+      setUser(null);
+      setUrls([]);
+      setLatestResult(null);
+      clearPendingEmailVerification();
+      addToast('Your account and its links have been deleted.', 'success');
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err, 'Could not delete your account.') };
+    }
+  };
+
   const handleChangePassword = async (payload) => {
     try {
       await API.post('/auth/change-password', payload, { headers: authHeaders });
@@ -557,6 +573,7 @@ function App() {
             onChangePassword={handleChangePassword}
             onRequestPasswordReset={handleRequestPasswordReset}
             onResetPassword={handleResetPassword}
+            onDeleteAccount={handleDeleteAccount}
           />
         )}
       </main>

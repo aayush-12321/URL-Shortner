@@ -14,6 +14,7 @@ import resend
 
 from app.database.db import get_session
 from app.models.models import (
+    ClickLog,
     EmailResendRequest,
     EmailChangeRequest,
     EmailVerification,
@@ -26,6 +27,8 @@ from app.models.models import (
     PasswordChangeRequest,
     PasswordResetComplete,
     PasswordResetRequest,
+    RefreshToken,
+    ShortenedURL,
 )
 from app.auth.security import (
     create_access_token,
@@ -693,6 +696,51 @@ def read_current_user(current_user: User = Depends(get_current_user)):
         auth_provider=current_user.auth_provider,
         created_at=current_user.created_at,
     )
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    response: Response,
+    confirmation: str = Body(embed=True),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Delete the authenticated account and all records owned by it."""
+    if confirmation != "DELETE":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "DELETE" to confirm account deletion.')
+
+    owned_urls = session.exec(
+        select(ShortenedURL).where(ShortenedURL.owner_id == current_user.id)
+    ).all()
+    short_codes = [url.short_code for url in owned_urls]
+
+    if short_codes:
+        click_logs = session.exec(
+            select(ClickLog).where(ClickLog.short_code.in_(short_codes))
+        ).all()
+        for click_log in click_logs:
+            session.delete(click_log)
+        for url in owned_urls:
+            session.delete(url)
+        session.flush()
+
+    verification = session.exec(
+        select(EmailVerification).where(EmailVerification.user_id == current_user.id)
+    ).first()
+    if verification:
+        session.delete(verification)
+
+    refresh_tokens = session.exec(
+        select(RefreshToken).where(RefreshToken.user_id == current_user.id)
+    ).all()
+    for refresh_token in refresh_tokens:
+        session.delete(refresh_token)
+
+    session.flush()
+    session.delete(current_user)
+    session.commit()
+    response.delete_cookie("refresh_token", path="/api/v1/auth/refresh")
+    return None
 
 
 @router.post("/change-password")

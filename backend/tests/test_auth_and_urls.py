@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 
 from app import database as db_module
 from app.auth.security import get_password_hash, verify_password
-from app.models.models import EmailVerification, ShortenedURL, User
+from app.models.models import ClickLog, EmailVerification, RefreshToken, ShortenedURL, User
 
 _send_verification_email = auth_router.send_verification_email
 
@@ -46,6 +46,70 @@ def test_password_hash_and_verify():
     assert hashed != password
     assert verify_password(password, hashed) is True
     assert verify_password("wrong-pass", hashed) is False
+
+
+def test_delete_account_removes_user_owned_data(client, mock_verification_email):
+    username, email, password = _random_user("account-delete")
+    _register_and_verify(client, (username, email, password), mock_verification_email)
+
+    login = client.post(
+        "/api/v1/auth/login",
+        data={"username": username, "password": password},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login.status_code == 200, login.text
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    owned_response = client.post(
+        "/api/v1/shorten",
+        json={"original_url": "https://owned.example.com"},
+        headers=headers,
+    )
+    anonymous_response = client.post(
+        "/api/v1/shorten",
+        json={"original_url": "https://anonymous.example.com"},
+    )
+    assert owned_response.status_code == 201, owned_response.text
+    assert anonymous_response.status_code == 201, anonymous_response.text
+
+    with Session(db_module.db.engine) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        user_id = user.id
+        session.add(ClickLog(short_code=owned_response.json()["short_code"]))
+        session.add(
+            EmailVerification(
+                user_id=user_id,
+                otp_hash="test-hash",
+                expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+                last_sent_at=datetime.now(timezone.utc),
+            )
+        )
+        session.commit()
+
+    invalid_confirmation = client.request(
+        "DELETE", "/api/v1/auth/me", json={"confirmation": "DELETE ME"}, headers=headers
+    )
+    assert invalid_confirmation.status_code == 400
+
+    deleted = client.request("DELETE", "/api/v1/auth/me", json={"confirmation": "DELETE"}, headers=headers)
+    assert deleted.status_code == 204, deleted.text
+
+    with Session(db_module.db.engine) as session:
+        assert session.exec(select(User).where(User.id == user_id)).first() is None
+        assert session.exec(
+            select(ShortenedURL).where(ShortenedURL.short_code == owned_response.json()["short_code"])
+        ).first() is None
+        assert session.exec(
+            select(ClickLog).where(ClickLog.short_code == owned_response.json()["short_code"])
+        ).first() is None
+        assert session.exec(
+            select(ShortenedURL).where(ShortenedURL.short_code == anonymous_response.json()["short_code"])
+        ).first() is not None
+        assert session.exec(select(EmailVerification).where(EmailVerification.user_id == user_id)).first() is None
+        assert session.exec(select(RefreshToken).where(RefreshToken.user_id == user_id)).first() is None
+
+    assert client.get("/api/v1/auth/me", headers=headers).status_code == 401
 
 
 def test_google_auth_creates_user_with_google_profile_name(client, monkeypatch):

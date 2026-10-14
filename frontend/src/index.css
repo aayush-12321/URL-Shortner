@@ -1991,6 +1991,38 @@ body {
     font-size: 0.78rem;
   }
 
+  .profile-delete-row {
+    padding: 1.1rem 1.25rem;
+    border: 1px solid rgba(244, 63, 94, 0.35);
+    border-radius: var(--radius-lg);
+    background: rgba(24, 24, 27, 0.65);
+  }
+
+  .profile-delete-row strong {
+    font-size: 0.86rem;
+  }
+
+  .profile-delete-row p {
+    margin-top: 0.2rem;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+  }
+
+  .profile-delete-trigger {
+    margin-top: 0.85rem;
+  }
+
+  .profile-delete-modal-form .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .profile-delete-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
   .auth-helper-text {
     margin: 0 0 1rem;
     color: var(--text-secondary);
