@@ -74,6 +74,7 @@ def test_google_auth_creates_user_with_google_profile_name(client, monkeypatch):
     assert profile.json()["username"] == "Google Profile Name"
     assert profile.json()["email"] == "google.user@example.com"
     assert profile.json()["image_url"] == "https://example.com/google-user.jpg"
+    assert profile.json()["auth_provider"] == "google"
 
 
 def test_google_auth_rejects_invalid_credential(client, monkeypatch):
@@ -503,3 +504,88 @@ def test_other_user_cannot_update_or_delete_owned_url(client, mock_verification_
         headers={"Authorization": f"Bearer {bob_token}"},
     )
     assert forbidden_delete.status_code == 403, forbidden_delete.text
+
+
+def test_password_change_requires_current_password_and_updates_credentials(client, mock_verification_email):
+    user = _random_user("password-change")
+    _register_and_verify(client, user, mock_verification_email)
+    login = client.post("/api/v1/auth/login", data={"username": user[0], "password": user[2]})
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    incorrect = client.post(
+        "/api/v1/auth/change-password",
+        headers=headers,
+        json={"current_password": "WrongPass123!", "new_password": "AnotherPass123!", "confirm_password": "AnotherPass123!"},
+    )
+    assert incorrect.status_code == 401
+
+    changed = client.post(
+        "/api/v1/auth/change-password",
+        headers=headers,
+        json={"current_password": user[2], "new_password": "AnotherPass123!", "confirm_password": "AnotherPass123!"},
+    )
+    assert changed.status_code == 200, changed.text
+    assert client.post("/api/v1/auth/login", data={"username": user[0], "password": "AnotherPass123!"}).status_code == 200
+    assert client.post("/api/v1/auth/login", data={"username": user[0], "password": user[2]}).status_code == 401
+
+
+def test_forgot_password_otp_resets_password_and_is_single_use(client, mock_verification_email, monkeypatch):
+    user = _random_user("password-reset")
+    _register_and_verify(client, user, mock_verification_email)
+    reset_codes = {}
+    monkeypatch.setattr(auth_router, "send_password_reset_email", lambda email, code: reset_codes.__setitem__(email, code))
+
+    requested = client.post("/api/v1/auth/forgot-password", json={"email": user[1]})
+    assert requested.status_code == 200, requested.text
+    assert reset_codes[user[1]]
+
+    reset = client.post(
+        "/api/v1/auth/reset-password",
+        json={
+            "email": user[1],
+            "code": reset_codes[user[1]],
+            "new_password": "ResetPass123!",
+            "confirm_password": "ResetPass123!",
+        },
+    )
+    assert reset.status_code == 200, reset.text
+    assert client.post("/api/v1/auth/login", data={"username": user[0], "password": "ResetPass123!"}).status_code == 200
+
+    reused = client.post(
+        "/api/v1/auth/reset-password",
+        json={
+            "email": user[1],
+            "code": reset_codes[user[1]],
+            "new_password": "AgainPass123!",
+            "confirm_password": "AgainPass123!",
+        },
+    )
+    assert reused.status_code == 400
+
+
+def test_google_accounts_cannot_change_or_reset_shortlink_password(client, monkeypatch):
+    monkeypatch.setattr(
+        auth_router.google_id_token,
+        "verify_oauth2_token",
+        lambda *_args, **_kwargs: {
+            "email": "google.only@example.com",
+            "email_verified": True,
+            "name": "Google Only",
+        },
+    )
+    reset_emails = []
+    monkeypatch.setattr(auth_router, "send_password_reset_email", lambda email, code: reset_emails.append(email))
+    signed_in = client.post("/api/v1/auth/google/authenticate", json={"credential": "google-credential"})
+    token = signed_in.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    changed = client.post(
+        "/api/v1/auth/change-password",
+        headers=headers,
+        json={"current_password": "anything", "new_password": "NewPassword123!", "confirm_password": "NewPassword123!"},
+    )
+    assert changed.status_code == 400
+    reset_requested = client.post("/api/v1/auth/forgot-password", json={"email": "google.only@example.com"})
+    assert reset_requested.status_code == 200
+    assert reset_emails == []

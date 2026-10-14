@@ -33,6 +33,7 @@ function AuthModal({
   const googleButtonRef = useRef(null);
   const googleCredentialHandler = useRef(onGoogleCredential);
   const isVerificationStep = mode === 'verify' || mode === 'change-email';
+  const isForgotStep = mode === 'forgot-request' || mode === 'forgot-reset';
 
   googleCredentialHandler.current = onGoogleCredential;
 
@@ -85,7 +86,7 @@ function AuthModal({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || isVerificationStep) return undefined;
+    if (!isOpen || isVerificationStep || isForgotStep) return undefined;
 
     let cancelled = false;
     setGoogleError('');
@@ -141,7 +142,7 @@ function AuthModal({
 
     loadGoogleButton();
     return () => { cancelled = true; };
-  }, [isOpen, isVerificationStep]);
+  }, [isOpen, isVerificationStep, isForgotStep]);
 
   if (!isOpen) return null;
 
@@ -190,8 +191,26 @@ function AuthModal({
       setFormError('Passwords do not match.');
       return;
     }
+    if (mode === 'forgot-reset') {
+      if (!/^\d{6}$/.test(verificationCode)) {
+        setFormError('Enter the six-digit code from your email.');
+        return;
+      }
+      if (form.password !== form.confirmPassword) {
+        setFormError('Passwords do not match.');
+        return;
+      }
+    }
     setFormError('');
-    const result = await onSubmit(mode, form);
+    const result = await onSubmit(
+      mode,
+      mode === 'forgot-reset' ? { ...form, verificationCode } : form,
+    );
+    if (mode === 'forgot-request' && result) {
+      setMode('forgot-reset');
+      setVerificationCode('');
+      setForm((prev) => ({ ...prev, password: '', confirmPassword: '' }));
+    }
     if (mode === 'register' && result) setVerificationCode('');
   };
 
@@ -200,7 +219,7 @@ function AuthModal({
       <div className="modal-container" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">
-            {mode === 'verify' ? 'Verify your email' : mode === 'change-email' ? 'Change email address' : mode === 'login' ? 'Welcome Back' : 'Create Account'}
+            {mode === 'verify' ? 'Verify your email' : mode === 'change-email' ? 'Change email address' : mode === 'forgot-request' ? 'Reset your password' : mode === 'forgot-reset' ? 'Choose a new password' : mode === 'login' ? 'Welcome Back' : 'Create Account'}
           </h3>
           <button className="modal-close" onClick={onClose}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -211,7 +230,7 @@ function AuthModal({
         </div>
 
         <div className="modal-body">
-          {!isVerificationStep && (
+          {!isVerificationStep && !isForgotStep && (
             <div className="modal-tabs">
               <button
                 className={`tab-btn ${mode === 'login' ? 'active' : ''}`}
@@ -228,7 +247,7 @@ function AuthModal({
             </div>
           )}
 
-          {!isVerificationStep && (
+          {!isVerificationStep && !isForgotStep && (
             <div style={{ margin: '0.25rem 0 1.25rem', textAlign: 'center' }}>
               <div ref={googleButtonRef} style={{ display: 'flex', justifyContent: 'center', minHeight: '40px' }} />
               {googleLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Loading Google sign-in…</span>}
@@ -250,7 +269,76 @@ function AuthModal({
             </div>
           )}
 
-          {mode === 'verify' ? (
+          {mode === 'forgot-request' ? (
+            <form onSubmit={handleSubmit}>
+              <p className="auth-helper-text">Enter the email address on your account. If it uses a password, we’ll send a one-time reset code.</p>
+              <div className="form-group">
+                <label htmlFor="forgot-email">Email address</label>
+                <input
+                  id="forgot-email"
+                  type="email"
+                  name="email"
+                  className="form-input form-input-simple"
+                  value={form.email}
+                  onChange={handleChange}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
+                {loading ? 'Sending…' : 'Send reset code'}
+              </button>
+              <button type="button" className="btn btn-ghost auth-back-button" onClick={() => setMode('login')} disabled={loading}>
+                Back to log in
+              </button>
+            </form>
+          ) : mode === 'forgot-reset' ? (
+            <form onSubmit={handleSubmit}>
+              <p className="auth-helper-text">Enter the code sent to <strong>{form.email}</strong>, then choose a new password. Google accounts should continue with Google sign-in.</p>
+              <div className="form-group">
+                <label htmlFor="forgot-code">Reset code</label>
+                <input
+                  id="forgot-code"
+                  type="text"
+                  className="form-input form-input-simple"
+                  value={verificationCode}
+                  onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="forgot-new-password">New password</label>
+                <div className="password-input-wrap">
+                  <input id="forgot-new-password" type={passwordVisible ? 'text' : 'password'} name="password" className="form-input form-input-simple" value={form.password} onChange={handleChange} minLength={8} autoComplete="new-password" required />
+                  <button type="button" className="password-visibility-toggle" onClick={() => setPasswordVisible((visible) => !visible)} aria-label={passwordVisible ? 'Hide password' : 'Show password'} aria-pressed={passwordVisible}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      {passwordVisible ? <><path d="M3 3l18 18" /><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.5 9.5 7a11.8 11.8 0 0 1-3.1 4.2" /><path d="M6.2 6.2A12.2 12.2 0 0 0 2.5 12c1 2.5 4.5 7 9.5 7a9.8 9.8 0 0 0 3.1-.5" /></> : <><path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" /><circle cx="12" cy="12" r="3" /></>}
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div className="form-group">
+                <label htmlFor="forgot-confirm-password">Confirm new password</label>
+                <div className="password-input-wrap">
+                  <input id="forgot-confirm-password" type={confirmPasswordVisible ? 'text' : 'password'} name="confirmPassword" className="form-input form-input-simple" value={form.confirmPassword} onChange={handleChange} minLength={8} autoComplete="new-password" required />
+                  <button type="button" className="password-visibility-toggle" onClick={() => setConfirmPasswordVisible((visible) => !visible)} aria-label={confirmPasswordVisible ? 'Hide confirmation password' : 'Show confirmation password'} aria-pressed={confirmPasswordVisible}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      {confirmPasswordVisible ? <><path d="M3 3l18 18" /><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.5 9.5 7a11.8 11.8 0 0 1-3.1 4.2" /><path d="M6.2 6.2A12.2 12.2 0 0 0 2.5 12c1 2.5 4.5 7 9.5 7a9.8 9.8 0 0 0 3.1-.5" /></> : <><path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" /><circle cx="12" cy="12" r="3" /></>}
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
+                {loading ? 'Resetting…' : 'Reset password'}
+              </button>
+              <button type="button" className="btn btn-ghost auth-back-button" onClick={() => setMode('forgot-request')} disabled={loading}>
+                Use a different email
+              </button>
+            </form>
+          ) : mode === 'verify' ? (
             <form onSubmit={handleSubmit}>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', textAlign: 'center' }}>
                 Enter the six-digit code sent to <strong style={{ color: 'var(--text-main)' }}>{verificationEmail}</strong>.
@@ -476,6 +564,15 @@ function AuthModal({
                 'Create Account'
               )}
             </button>
+            {mode === 'login' && (
+              <button
+                type="button"
+                className="btn btn-ghost auth-forgot-button"
+                onClick={() => { setMode('forgot-request'); setFormError(''); }}
+              >
+                Forgot password?
+              </button>
+            )}
           </form>
           )}
         </div>

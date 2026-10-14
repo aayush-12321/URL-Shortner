@@ -12,6 +12,7 @@ class User(SQLModel, table=True):
     email: EmailStr = Field(unique=True, index=True)
     hashed_password: str
     image_url: str | None = Field(default=None)
+    auth_provider: str = Field(default="password")
     email_verified: bool = Field(default=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -52,7 +53,39 @@ class UserRead(SQLModel):
     username: str
     email: EmailStr
     image_url: str | None = None
+    auth_provider: str = "password"
     created_at: datetime
+
+
+class PasswordChangeRequest(SQLModel):
+    current_password: str = Field(min_length=1, max_length=72)
+    new_password: str = Field(min_length=8, max_length=72)
+    confirm_password: str = Field(min_length=8, max_length=72)
+
+    @model_validator(mode="after")
+    def passwords_match(self):
+        if self.new_password != self.confirm_password:
+            raise ValueError("Passwords do not match.")
+        return self
+
+
+class PasswordResetRequest(SQLModel):
+    email: EmailStr
+
+
+class PasswordResetComplete(SQLModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=8, max_length=72)
+    confirm_password: str = Field(min_length=8, max_length=72)
+
+    @model_validator(mode="after")
+    def validate_reset(self):
+        if not self.code.isdigit():
+            raise ValueError("Verification code must contain only digits.")
+        if self.new_password != self.confirm_password:
+            raise ValueError("Passwords do not match.")
+        return self
 
 
 class EmailVerificationRequest(SQLModel):

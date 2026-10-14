@@ -59,6 +59,12 @@ def create_db_and_tables():
                 )
             )
 
+    if "auth_provider" not in user_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text('ALTER TABLE "user" ADD COLUMN auth_provider VARCHAR NOT NULL DEFAULT \'password\'')
+            )
+
 
 
 def get_session() -> Generator[Session, None, None]:

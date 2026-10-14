@@ -23,6 +23,9 @@ from app.models.models import (
     User,
     UserCreate,
     UserRead,
+    PasswordChangeRequest,
+    PasswordResetComplete,
+    PasswordResetRequest,
 )
 from app.auth.security import (
     create_access_token,
@@ -250,6 +253,7 @@ def google_authenticate(
             email=email,
             hashed_password=get_password_hash(uuid4().hex),
             image_url=image_url,
+            auth_provider="google",
             email_verified=True,
         )
         session.add(user)
@@ -289,6 +293,28 @@ def google_authenticate(
         path="/api/v1/auth/refresh",
     )
     return Token(access_token=access_token, token_type="bearer")
+
+
+def send_password_reset_email(email: str, code: str) -> None:
+    resend.api_key = settings.RESEND_API_KEY.get_secret_value()
+    resend.Emails.send(
+       {
+            "from": settings.EMAIL_FROM,
+            "to": [email],
+            "subject": "Reset Your Password | ShortLink",
+            "text": (
+                "Hello,\n\n"
+                "We received a request to reset the password for your ShortLink account.\n\n"
+                f"Your password reset verification code is: {code}\n\n"
+                f"This code will expire in {OTP_EXPIRY_MINUTES} minutes. "
+                "For your security, do not share this code with anyone.\n\n"
+                "If you did not request a password reset, you can safely ignore "
+                "this email. Your password will remain unchanged.\n\n"
+                "Best regards,\n"
+                "The ShortLink Team"
+            ),
+        }
+    )
 
 
 @router.post("/register", response_model=EmailVerificationResponse, status_code=status.HTTP_201_CREATED)
@@ -664,8 +690,122 @@ def read_current_user(current_user: User = Depends(get_current_user)):
         username=current_user.username,
         email=current_user.email,
         image_url=current_user.image_url,
+        auth_provider=current_user.auth_provider,
         created_at=current_user.created_at,
     )
+
+
+@router.post("/change-password")
+def change_password(
+    payload: PasswordChangeRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    rate_limiter("change-password", 5)(request)
+    if current_user.auth_provider == "google":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This account uses Google sign-in. Manage your password through Google.",
+        )
+    if len(payload.current_password.encode("utf-8")) > 72 or not verify_password(
+        payload.current_password, current_user.hashed_password
+    ):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect")
+    if len(payload.new_password.encode("utf-8")) > 72:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Password must be 72 bytes or fewer")
+    if verify_password(payload.new_password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password must be different")
+
+    current_user.hashed_password = get_password_hash(payload.new_password)
+    session.add(current_user)
+    session.commit()
+    return {"message": "Password updated successfully."}
+
+
+@router.post("/forgot-password")
+def forgot_password(
+    payload: PasswordResetRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    rate_limiter("forgot-password", 5)(request)
+    email = str(payload.email).lower()
+    user = session.exec(select(User).where(func.lower(User.email) == email)).first()
+    message = "If this email belongs to a password-based account, a reset code has been sent. Google accounts should sign in with Google."
+    if not user or not user.email_verified or user.auth_provider == "google":
+        return {"message": message}
+
+    now = datetime.now(timezone.utc)
+    verification = session.exec(
+        select(EmailVerification).where(EmailVerification.user_id == user.id)
+    ).first()
+    if verification and (now - utc_datetime(verification.last_sent_at)).total_seconds() < OTP_RESEND_COOLDOWN_SECONDS:
+        return {"message": message}
+
+    code = create_verification_code()
+    code_hash = hash_verification_code(code)
+    while verification and hmac.compare_digest(verification.otp_hash, code_hash):
+        code = create_verification_code()
+        code_hash = hash_verification_code(code)
+    try:
+        send_password_reset_email(email, code)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not send the password reset email. Please try again.",
+        ) from exc
+
+    if verification:
+        verification.otp_hash = code_hash
+        verification.expires_at = now + timedelta(minutes=OTP_EXPIRY_MINUTES)
+        verification.attempts = 0
+        verification.last_sent_at = now
+    else:
+        verification = EmailVerification(
+            user_id=user.id,
+            otp_hash=code_hash,
+            expires_at=now + timedelta(minutes=OTP_EXPIRY_MINUTES),
+            attempts=0,
+            last_sent_at=now,
+        )
+    session.add(verification)
+    session.commit()
+    return {"message": message}
+
+
+@router.post("/reset-password")
+def reset_password(payload: PasswordResetComplete, request: Request, session: Session = Depends(get_session)):
+    rate_limiter("reset-password", 10)(request)
+    email = str(payload.email).lower()
+    user = session.exec(select(User).where(func.lower(User.email) == email)).first()
+    if not user or not user.email_verified or user.auth_provider == "google":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset code")
+    if len(payload.new_password.encode("utf-8")) > 72:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Password must be 72 bytes or fewer")
+
+    verification = session.exec(
+        select(EmailVerification).where(EmailVerification.user_id == user.id)
+    ).first()
+    if not verification:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset code")
+    if verification.attempts >= OTP_MAX_ATTEMPTS:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many incorrect codes. Request another code.")
+    if datetime.now(timezone.utc) >= utc_datetime(verification.expires_at):
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Reset code has expired")
+    if not hmac.compare_digest(verification.otp_hash, hash_verification_code(payload.code)):
+        verification.attempts += 1
+        session.add(verification)
+        session.commit()
+        if verification.attempts >= OTP_MAX_ATTEMPTS:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many incorrect codes. Request another code.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid reset code")
+
+    user.hashed_password = get_password_hash(payload.new_password)
+    session.add(user)
+    session.delete(verification)
+    session.commit()
+    return {"message": "Password reset successfully. You can now sign in."}
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
